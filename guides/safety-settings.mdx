@@ -1,0 +1,228 @@
+---
+title: Safety Settings
+description: Configure safety filters and handle blocked responses in Gemini models
+---
+
+Gemini models include built-in safety filters to prevent generating harmful content. You can configure these filters to balance safety requirements with your application's needs.
+
+## Basic Safety Configuration
+
+Configure safety settings by specifying harm categories and blocking thresholds:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Say something bad.',
+    config=types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category='HARM_CATEGORY_HATE_SPEECH',
+                threshold='BLOCK_ONLY_HIGH',
+            )
+        ]
+    ),
+)
+print(response.text)
+```
+
+## Safety Categories
+
+Gemini models evaluate content across these safety categories:
+
+- `HARM_CATEGORY_HATE_SPEECH` - Negative or harmful comments targeting identity and/or protected attributes
+- `HARM_CATEGORY_DANGEROUS_CONTENT` - Content that facilitates, promotes, or enables harmful acts
+- `HARM_CATEGORY_HARASSMENT` - Malicious, intimidating, bullying, or abusive content
+- `HARM_CATEGORY_SEXUALLY_EXPLICIT` - Content that contains references to sexual acts or explicit material
+
+## Safety Thresholds
+
+Control the blocking behavior with these threshold levels:
+
+- `BLOCK_NONE` - Don't block any content (use with caution)
+- `BLOCK_ONLY_HIGH` - Block only high-probability harmful content
+- `BLOCK_MEDIUM_AND_ABOVE` - Block medium and high-probability harmful content (default)
+- `BLOCK_LOW_AND_ABOVE` - Block low, medium, and high-probability harmful content
+- `HARM_BLOCK_THRESHOLD_UNSPECIFIED` - Use the default threshold
+
+## Configuring Multiple Categories
+
+Set different thresholds for different categories:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Write a story about conflict',
+    config=types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category='HARM_CATEGORY_HATE_SPEECH',
+                threshold='BLOCK_LOW_AND_ABOVE',
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE',
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_HARASSMENT',
+                threshold='BLOCK_ONLY_HIGH',
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE',
+            ),
+        ]
+    ),
+)
+print(response.text)
+```
+
+## Handling Blocked Responses
+
+When content is blocked by safety filters, you can check the safety ratings:
+
+```python
+from google.genai import types
+
+try:
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents='Generate harmful content',
+        config=types.GenerateContentConfig(
+            safety_settings=[
+                types.SafetySetting(
+                    category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                    threshold='BLOCK_MEDIUM_AND_ABOVE',
+                )
+            ]
+        ),
+    )
+    print(response.text)
+except Exception as e:
+    print(f"Content blocked: {e}")
+```
+
+## Checking Safety Ratings
+
+Inspect the safety ratings for each response:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Tell me about cybersecurity',
+    config=types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_ONLY_HIGH',
+            )
+        ]
+    ),
+)
+
+# Check safety ratings
+if response.candidates:
+    for rating in response.candidates[0].safety_ratings:
+        print(f"{rating.category}: {rating.probability}")
+```
+
+## Disabling Safety Filters
+
+<Warning>
+Disabling safety filters may allow the model to generate harmful content. Only do this in controlled environments with appropriate safeguards.
+</Warning>
+
+To minimize blocking, set all categories to `BLOCK_NONE`:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Your prompt here',
+    config=types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category='HARM_CATEGORY_HATE_SPEECH',
+                threshold='BLOCK_NONE',
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_NONE',
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_HARASSMENT',
+                threshold='BLOCK_NONE',
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold='BLOCK_NONE',
+            ),
+        ]
+    ),
+)
+print(response.text)
+```
+
+## Best Practices
+
+- **Start conservative**: Begin with stricter settings and adjust based on your use case
+- **Handle blocked responses**: Always include error handling for blocked content
+- **Check safety ratings**: Monitor safety ratings to understand why content was blocked
+- **Use appropriate thresholds**: Different applications have different safety requirements
+- **Document your settings**: Keep track of which safety settings you're using and why
+
+## Use Cases
+
+### Content Moderation System
+
+Use strict settings for user-facing content:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=user_input,
+    config=types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category=category,
+                threshold='BLOCK_LOW_AND_ABOVE',
+            )
+            for category in [
+                'HARM_CATEGORY_HATE_SPEECH',
+                'HARM_CATEGORY_DANGEROUS_CONTENT',
+                'HARM_CATEGORY_HARASSMENT',
+                'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            ]
+        ]
+    ),
+)
+```
+
+### Creative Writing Assistant
+
+Use more permissive settings for creative content:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Write a thriller story',
+    config=types.GenerateContentConfig(
+        safety_settings=[
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_ONLY_HIGH',  # Allow fictional dangerous content
+            )
+        ]
+    ),
+)
+```

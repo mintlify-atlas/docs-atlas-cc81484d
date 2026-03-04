@@ -1,0 +1,197 @@
+---
+title: 'tunings.tune'
+description: 'Create a new tuning job to fine-tune a model'
+---
+
+<Note>
+The SDK's tuning implementation is experimental, and may change in future versions.
+</Note>
+
+## Method
+
+```python
+client.tunings.tune(
+    base_model: str,
+    training_dataset: TuningDataset,
+    config: Optional[CreateTuningJobConfig] = None
+) -> TuningJob
+```
+
+Creates a tuning job and returns the `TuningJob` object. This method initiates a fine-tuning process for a specified base model using the provided training dataset.
+
+<ParamField path="base_model" type="string" required>
+  The name of the model to tune. For Vertex AI, this can also be a pre-tuned model resource name starting with `projects/`.
+</ParamField>
+
+<ParamField path="training_dataset" type="TuningDataset" required>
+  The training dataset to use for tuning. Can be one of:
+  - `gcs_uri`: GCS bucket path (Vertex AI only)
+  - `vertex_dataset_resource`: Vertex AI Dataset resource (Vertex AI only)
+  - `examples`: Inline training examples (Gemini API only)
+</ParamField>
+
+<ParamField path="config" type="CreateTuningJobConfig">
+  Configuration options for the tuning job:
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="tuned_model_display_name" type="string">
+      Display name for the tuned model
+    </ParamField>
+    
+    <ParamField path="description" type="string">
+      Description of the tuning job (Vertex AI only)
+    </ParamField>
+    
+    <ParamField path="epoch_count" type="int">
+      Number of training epochs
+    </ParamField>
+    
+    <ParamField path="learning_rate_multiplier" type="float">
+      Multiplier for the learning rate
+    </ParamField>
+    
+    <ParamField path="batch_size" type="int">
+      Training batch size
+    </ParamField>
+    
+    <ParamField path="learning_rate" type="float">
+      Base learning rate for training
+    </ParamField>
+    
+    <ParamField path="adapter_size" type="string">
+      Size of the adapter for LoRA tuning (Vertex AI only)
+    </ParamField>
+    
+    <ParamField path="validation_dataset" type="TuningValidationDataset">
+      Validation dataset for evaluation during tuning (Vertex AI only)
+    </ParamField>
+    
+    <ParamField path="evaluation_config" type="EvaluationConfig">
+      Configuration for model evaluation (Vertex AI only)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="name" type="string">
+  The resource name of the tuning job
+</ResponseField>
+
+<ResponseField name="state" type="JobState">
+  Current state of the tuning job. One of:
+  - `JOB_STATE_QUEUED`: Job is queued
+  - `JOB_STATE_PENDING`: Job is pending
+  - `JOB_STATE_RUNNING`: Job is running
+  - `JOB_STATE_SUCCEEDED`: Job completed successfully
+  - `JOB_STATE_FAILED`: Job failed
+  - `JOB_STATE_CANCELLED`: Job was cancelled
+</ResponseField>
+
+<ResponseField name="create_time" type="string">
+  Timestamp when the job was created
+</ResponseField>
+
+<ResponseField name="start_time" type="string">
+  Timestamp when the job started running
+</ResponseField>
+
+<ResponseField name="end_time" type="string">
+  Timestamp when the job completed
+</ResponseField>
+
+<ResponseField name="base_model" type="string">
+  The base model being tuned
+</ResponseField>
+
+<ResponseField name="tuned_model" type="TunedModel">
+  Information about the resulting tuned model
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key='your-api-key')
+
+# Create a tuning job
+tuning_job = client.tunings.tune(
+    base_model='gemini-1.5-flash-002',
+    training_dataset=types.TuningDataset(
+        gcs_uri='gs://my-bucket/training-data.jsonl'
+    ),
+    config=types.CreateTuningJobConfig(
+        tuned_model_display_name='my-tuned-model',
+        epoch_count=5,
+        learning_rate_multiplier=1.0
+    )
+)
+
+print(f"Tuning job created: {tuning_job.name}")
+print(f"State: {tuning_job.state}")
+```
+
+### Polling for Completion
+
+```python
+import time
+
+# Create tuning job
+tuning_job = client.tunings.tune(
+    base_model='gemini-1.5-flash-002',
+    training_dataset=types.TuningDataset(
+        gcs_uri='gs://my-bucket/training-data.jsonl'
+    )
+)
+
+# Poll until job completes
+while tuning_job.state in [
+    types.JobState.JOB_STATE_QUEUED,
+    types.JobState.JOB_STATE_PENDING,
+    types.JobState.JOB_STATE_RUNNING
+]:
+    print(f"Job state: {tuning_job.state}")
+    time.sleep(60)
+    tuning_job = client.tunings.get(name=tuning_job.name)
+
+if tuning_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    print(f"Tuning completed! Model: {tuning_job.tuned_model.model}")
+else:
+    print(f"Tuning failed with state: {tuning_job.state}")
+```
+
+### With Inline Examples (Gemini API)
+
+```python
+from google.genai import types
+
+tuning_job = client.tunings.tune(
+    base_model='gemini-1.5-flash-002',
+    training_dataset=types.TuningDataset(
+        examples=[
+            {
+                'text_input': 'What is the capital of France?',
+                'output': 'The capital of France is Paris.'
+            },
+            {
+                'text_input': 'What is 2+2?',
+                'output': '2+2 equals 4.'
+            }
+        ]
+    ),
+    config=types.CreateTuningJobConfig(
+        epoch_count=10,
+        batch_size=4
+    )
+)
+```
+
+## See Also
+
+- [tunings.get](/api/tunings/get) - Retrieve tuning job status
+- [tunings.list](/api/tunings/list) - List all tuning jobs
+- [tunings.cancel](/api/tunings/cancel) - Cancel a running tuning job

@@ -1,0 +1,336 @@
+---
+title: caches.delete
+description: Delete a cached content resource
+---
+
+Deletes a cached content resource. This frees up storage and stops billing for the cached tokens.
+
+## Method Signature
+
+```python
+client.caches.delete(
+    name: str,
+    config: Optional[DeleteCachedContentConfigOrDict] = None
+) -> DeleteCachedContentResponse
+```
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The cached content resource name to delete.
+  
+  Format: `"cachedContents/abc123"`
+</ParamField>
+
+<ParamField path="config" type="DeleteCachedContentConfig">
+  Optional configuration for the request.
+  
+  Available options:
+  - `http_options`: Custom HTTP request options
+</ParamField>
+
+## Returns
+
+<ResponseField name="response" type="DeleteCachedContentResponse">
+  A response object confirming the deletion.
+  
+  Contains:
+  - `sdk_http_response`: HTTP response metadata
+</ResponseField>
+
+## Examples
+
+### Delete Cache
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Delete a cache
+client.caches.delete(name='cachedContents/abc123')
+print("Cache deleted successfully")
+```
+
+### Delete After Use
+
+```python
+# Create cache for temporary use
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [{
+            'role': 'user',
+            'parts': [{'text': 'Temporary context'}]
+        }],
+        'ttl': '3600s'
+    }
+)
+
+# Use the cache
+response = client.models.generate_content(
+    model=cached.name,
+    contents='Query using cached context'
+)
+print(response.text)
+
+# Clean up immediately
+client.caches.delete(name=cached.name)
+print("Cache cleaned up")
+```
+
+### Delete Multiple Caches
+
+```python
+# Delete multiple caches
+cache_names = [
+    'cachedContents/abc123',
+    'cachedContents/def456',
+    'cachedContents/ghi789'
+]
+
+for name in cache_names:
+    try:
+        client.caches.delete(name=name)
+        print(f"Deleted: {name}")
+    except Exception as e:
+        print(f"Failed to delete {name}: {e}")
+```
+
+### Delete Old Caches
+
+```python
+from datetime import datetime, timedelta
+
+# Delete caches older than 12 hours
+for cached in client.caches.list():
+    age = datetime.now() - cached.create_time
+    
+    if age > timedelta(hours=12):
+        client.caches.delete(name=cached.name)
+        print(f"Deleted old cache: {cached.display_name}")
+```
+
+### Delete All Caches
+
+```python
+# Clear all cached content
+for cached in client.caches.list():
+    client.caches.delete(name=cached.name)
+    print(f"Deleted: {cached.display_name or cached.name}")
+
+print("All caches deleted")
+```
+
+### Async Delete
+
+```python
+import asyncio
+
+async def delete_cache():
+    # Delete cache asynchronously
+    await client.aio.caches.delete(name='cachedContents/abc123')
+    print("Cache deleted")
+
+asyncio.run(delete_cache())
+```
+
+### Delete with Verification
+
+```python
+def safe_delete_cache(cache_name: str) -> bool:
+    """Delete cache with verification."""
+    try:
+        # Verify cache exists
+        cached = client.caches.get(name=cache_name)
+        print(f"Deleting: {cached.display_name}")
+        
+        # Delete
+        client.caches.delete(name=cache_name)
+        
+        # Verify deletion
+        try:
+            client.caches.get(name=cache_name)
+            return False  # Still exists
+        except:
+            return True  # Successfully deleted
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+if safe_delete_cache('cachedContents/abc123'):
+    print("Deletion confirmed")
+else:
+    print("Deletion failed")
+```
+
+### Context Manager Pattern
+
+```python
+from contextlib import contextmanager
+from google.genai import types
+
+@contextmanager
+def temporary_cache(model: str, contents: list):
+    """Create cache and auto-delete when done."""
+    cached = client.caches.create(
+        model=model,
+        config={
+            'contents': contents,
+            'ttl': '3600s'
+        }
+    )
+    try:
+        yield cached
+    finally:
+        client.caches.delete(name=cached.name)
+        print(f"Cleaned up cache: {cached.name}")
+
+# Use the cache temporarily
+with temporary_cache(
+    'gemini-2.0-flash',
+    [types.Content(role='user', parts=[types.Part(text='Context')])]
+) as cached:
+    response = client.models.generate_content(
+        model=cached.name,
+        contents='Query'
+    )
+    print(response.text)
+# Cache is automatically deleted here
+```
+
+### Delete Expiring Caches
+
+```python
+from datetime import datetime, timedelta
+
+# Delete caches expiring in the next hour
+for cached in client.caches.list():
+    time_remaining = cached.expire_time - datetime.now()
+    
+    if time_remaining < timedelta(hours=1):
+        client.caches.delete(name=cached.name)
+        print(f"Deleted expiring cache: {cached.display_name}")
+```
+
+### Cleanup by Display Name Pattern
+
+```python
+# Delete caches matching a pattern
+for cached in client.caches.list():
+    if cached.display_name and 'temp' in cached.display_name.lower():
+        client.caches.delete(name=cached.name)
+        print(f"Deleted temporary cache: {cached.display_name}")
+```
+
+### Batch Delete with Results
+
+```python
+def delete_caches(cache_names: list[str]) -> dict:
+    """Delete multiple caches and return results."""
+    results = {'deleted': [], 'failed': []}
+    
+    for name in cache_names:
+        try:
+            client.caches.delete(name=name)
+            results['deleted'].append(name)
+        except Exception as e:
+            results['failed'].append({'name': name, 'error': str(e)})
+    
+    return results
+
+cache_names = ['cachedContents/abc123', 'cachedContents/def456']
+results = delete_caches(cache_names)
+
+print(f"Deleted: {len(results['deleted'])}")
+print(f"Failed: {len(results['failed'])}")
+for failure in results['failed']:
+    print(f"  {failure['name']}: {failure['error']}")
+```
+
+### Delete Cache After Session
+
+```python
+class CachedSession:
+    """Session that manages cache lifecycle."""
+    
+    def __init__(self, model: str, contents: list):
+        self.cached = client.caches.create(
+            model=model,
+            config={'contents': contents, 'ttl': '3600s'}
+        )
+    
+    def query(self, prompt: str):
+        return client.models.generate_content(
+            model=self.cached.name,
+            contents=prompt
+        )
+    
+    def close(self):
+        client.caches.delete(name=self.cached.name)
+        print("Session closed and cache deleted")
+
+# Use the session
+session = CachedSession(
+    'gemini-2.0-flash',
+    [{'role': 'user', 'parts': [{'text': 'Session context'}]}]
+)
+
+response = session.query('Question 1')
+print(response.text)
+
+response = session.query('Question 2')
+print(response.text)
+
+session.close()
+```
+
+## Cost Optimization
+
+<Info>
+Deleting caches when no longer needed:
+- Stops billing for cached token storage
+- Frees up cache quota
+- Prevents accidental use of outdated cached content
+
+Best practice: Delete caches immediately after use if they won't be reused.
+</Info>
+
+## Error Handling
+
+```python
+try:
+    client.caches.delete(name='cachedContents/abc123')
+    print("Cache deleted")
+except Exception as e:
+    if "not found" in str(e).lower():
+        print("Cache does not exist or was already deleted")
+    else:
+        print(f"Delete failed: {e}")
+```
+
+## Important Notes
+
+<Warning>
+- Once deleted, a cache cannot be recovered
+- Deletion is immediate and permanent
+- Active requests using the cache may fail
+- Delete caches before they're needed to avoid errors
+</Warning>
+
+<Note>
+Caches are automatically deleted when they expire, so manual deletion is optional. However, deleting unused caches early can reduce costs.
+</Note>
+
+## API Availability
+
+<Note>
+This method is available in both **Gemini API** and **Vertex AI**.
+</Note>
+
+## Related Methods
+
+- [caches.create](/api/caches/create) - Create a new cache
+- [caches.get](/api/caches/get) - Get cache metadata
+- [caches.update](/api/caches/update) - Update cache expiration
+- [caches.list](/api/caches/list) - List all caches

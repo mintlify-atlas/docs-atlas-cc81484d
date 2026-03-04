@@ -1,0 +1,253 @@
+---
+title: files.delete
+description: Delete a file from the Gemini API
+---
+
+Deletes a remotely stored file from the Gemini File API.
+
+## Method Signature
+
+```python
+client.files.delete(
+    name: str,
+    config: Optional[DeleteFileConfigOrDict] = None
+) -> DeleteFileResponse
+```
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The file resource name to delete.
+  
+  Format: `"files/abc123"` or just `"abc123"`
+</ParamField>
+
+<ParamField path="config" type="DeleteFileConfig">
+  Optional configuration for the request.
+  
+  Available options:
+  - `http_options`: Custom HTTP request options
+</ParamField>
+
+## Returns
+
+<ResponseField name="response" type="DeleteFileResponse">
+  A response object confirming the deletion.
+  
+  Contains:
+  - `sdk_http_response`: HTTP response metadata
+</ResponseField>
+
+## Examples
+
+### Delete File by Name
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Delete a file
+client.files.delete(name='files/abc123')
+print("File deleted successfully")
+```
+
+### Delete After Using
+
+```python
+from google.genai import types
+
+# Upload file
+file = client.files.upload(file='temp_document.pdf')
+
+# Use the file
+response = client.models.generate_content(
+    model='gemini-2.0-flash',
+    contents=[
+        types.Part(file_data=types.FileData(file_uri=file.uri)),
+        'Summarize this document'
+    ]
+)
+print(response.text)
+
+# Delete when done
+client.files.delete(name=file.name)
+print("Cleanup complete")
+```
+
+### Delete with Short Name
+
+```python
+# Both formats work
+client.files.delete(name='files/abc123')
+client.files.delete(name='abc123')
+```
+
+### Delete Multiple Files
+
+```python
+# Get list of files to delete
+files_to_delete = ['files/abc123', 'files/def456', 'files/ghi789']
+
+for file_name in files_to_delete:
+    try:
+        client.files.delete(name=file_name)
+        print(f"Deleted: {file_name}")
+    except Exception as e:
+        print(f"Failed to delete {file_name}: {e}")
+```
+
+### Cleanup Old Files
+
+```python
+from datetime import datetime, timedelta
+
+# Delete files older than 24 hours
+for file in client.files.list():
+    if file.create_time:
+        # Assuming create_time is a datetime object or can be parsed
+        age = datetime.now() - file.create_time
+        if age > timedelta(hours=24):
+            client.files.delete(name=file.name)
+            print(f"Deleted old file: {file.display_name}")
+```
+
+### Async Delete
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def delete_file():
+    # Delete file asynchronously
+    await client.aio.files.delete(name='files/abc123')
+    print("File deleted")
+
+asyncio.run(delete_file())
+```
+
+### Delete All Files
+
+```python
+# Clear all uploaded files
+for file in client.files.list():
+    client.files.delete(name=file.name)
+    print(f"Deleted: {file.display_name or file.name}")
+
+print("All files deleted")
+```
+
+### Safe Delete with Verification
+
+```python
+def safe_delete(file_name: str) -> bool:
+    """Delete file with verification."""
+    try:
+        # Check if file exists
+        file = client.files.get(name=file_name)
+        print(f"Deleting: {file.display_name}")
+        
+        # Delete
+        client.files.delete(name=file_name)
+        
+        # Verify deletion
+        try:
+            client.files.get(name=file_name)
+            return False  # File still exists
+        except:
+            return True  # File successfully deleted
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+if safe_delete('files/abc123'):
+    print("Deletion confirmed")
+```
+
+### Batch Delete with Error Handling
+
+```python
+def delete_files(file_names: list[str]) -> dict:
+    """Delete multiple files and return results."""
+    results = {'success': [], 'failed': []}
+    
+    for name in file_names:
+        try:
+            client.files.delete(name=name)
+            results['success'].append(name)
+        except Exception as e:
+            results['failed'].append({'name': name, 'error': str(e)})
+    
+    return results
+
+file_names = ['files/abc123', 'files/def456']
+results = delete_files(file_names)
+
+print(f"Deleted: {len(results['success'])}")
+print(f"Failed: {len(results['failed'])}")
+```
+
+### Context Manager Pattern
+
+```python
+from contextlib import contextmanager
+from google.genai import types
+
+@contextmanager
+def temporary_file(file_path: str):
+    """Upload file and auto-delete when done."""
+    file = client.files.upload(file=file_path)
+    try:
+        yield file
+    finally:
+        client.files.delete(name=file.name)
+        print(f"Cleaned up: {file.name}")
+
+# Use the file temporarily
+with temporary_file('document.pdf') as file:
+    response = client.models.generate_content(
+        model='gemini-2.0-flash',
+        contents=[
+            types.Part(file_data=types.FileData(file_uri=file.uri)),
+            'Summarize this'
+        ]
+    )
+    print(response.text)
+# File is automatically deleted here
+```
+
+## Error Handling
+
+```python
+try:
+    client.files.delete(name='files/abc123')
+    print("File deleted")
+except Exception as e:
+    if "not found" in str(e).lower():
+        print("File does not exist or was already deleted")
+    else:
+        print(f"Delete failed: {e}")
+```
+
+## Important Notes
+
+<Info>
+- Files are automatically deleted after 48 hours
+- Deleting a file that doesn't exist will raise an error
+- Once deleted, a file cannot be recovered
+- File deletion is immediate and cannot be undone
+</Info>
+
+## API Availability
+
+<Warning>
+This method is **only available in the Gemini API** (not Vertex AI).
+</Warning>
+
+## Related Methods
+
+- [files.upload](/api/files/upload) - Upload a new file
+- [files.get](/api/files/get) - Get file metadata
+- [files.list](/api/files/list) - List all files

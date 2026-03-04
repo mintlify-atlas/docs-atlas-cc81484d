@@ -1,0 +1,149 @@
+---
+title: Veo
+description: Generate videos using text-to-video, image-to-video, and video-to-video with Veo models
+---
+
+<Warning>
+Video generation with Veo is currently in public preview.
+</Warning>
+
+Veo models enable you to generate videos from text prompts, images, or existing videos.
+
+## Text-to-video generation
+
+Generate videos from text prompts:
+
+```python
+import time
+from google.genai import types
+
+# Create operation
+operation = client.models.generate_videos(
+    model='veo-3.1-generate-preview',
+    prompt='A neon hologram of a cat driving at top speed',
+    config=types.GenerateVideosConfig(
+        number_of_videos=1,
+        duration_seconds=5,
+        enhance_prompt=True,
+    ),
+)
+
+# Poll operation
+while not operation.done:
+    time.sleep(20)
+    operation = client.operations.get(operation)
+
+video = operation.response.generated_videos[0].video
+video.show()
+```
+
+## Image-to-video generation
+
+Generate videos from a starting image:
+
+```python
+import time
+from google.genai import types
+
+# Read local image (uses mimetypes.guess_type to infer mime type)
+image = types.Image.from_file("local/path/file.png")
+
+# Create operation
+operation = client.models.generate_videos(
+    model='veo-3.1-generate-preview',
+    # Prompt is optional if image is provided
+    prompt='Night sky',
+    image=image,
+    config=types.GenerateVideosConfig(
+        number_of_videos=1,
+        duration_seconds=5,
+        enhance_prompt=True,
+        # Can also pass an Image into last_frame for frame interpolation
+    ),
+)
+
+# Poll operation
+while not operation.done:
+    time.sleep(20)
+    operation = client.operations.get(operation)
+
+video = operation.response.generated_videos[0].video
+video.show()
+```
+
+## Video-to-video generation
+
+<Note>
+Currently, only Gemini Developer API supports video extension on Veo 3.1 for previously generated videos. Vertex AI supports video extension on Veo 2.0.
+</Note>
+
+Generate videos by extending or modifying existing videos:
+
+```python
+import time
+from google.genai import types
+
+# Read local video (uses mimetypes.guess_type to infer mime type)
+video = types.Video.from_file("local/path/video.mp4")
+
+# Create operation
+operation = client.models.generate_videos(
+    model='veo-3.1-generate-preview',
+    # Prompt is optional if Video is provided
+    prompt='Night sky',
+    # Input video must be in GCS for Vertex or a URI for Gemini
+    video=types.Video(
+        uri="gs://bucket-name/inputs/videos/cat_driving.mp4",
+    ),
+    config=types.GenerateVideosConfig(
+        number_of_videos=1,
+        duration_seconds=5,
+        enhance_prompt=True,
+    ),
+)
+
+# Poll operation
+while not operation.done:
+    time.sleep(20)
+    operation = client.operations.get(operation)
+
+video = operation.response.generated_videos[0].video
+video.show()
+```
+
+## Configuration options
+
+The `GenerateVideosConfig` supports:
+
+- **number_of_videos** - Number of videos to generate
+- **duration_seconds** - Video duration (e.g., 5, 10)
+- **enhance_prompt** - Automatically enhance the prompt for better results
+- **last_frame** - Provide an ending frame for frame interpolation
+
+## Polling long-running operations
+
+Video generation is an asynchronous operation. Poll the operation status:
+
+```python
+import time
+
+while not operation.done:
+    time.sleep(20)
+    operation = client.operations.get(operation)
+
+if operation.error:
+    print(f"Error: {operation.error}")
+else:
+    video = operation.response.generated_videos[0].video
+    video.show()
+```
+
+## GCS paths for Vertex AI
+
+When using Vertex AI, input videos must be stored in Google Cloud Storage:
+
+```python
+video = types.Video(
+    uri="gs://bucket-name/inputs/videos/cat_driving.mp4",
+)
+```

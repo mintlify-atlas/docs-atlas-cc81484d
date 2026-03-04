@@ -1,0 +1,286 @@
+---
+title: 'batches.delete'
+description: 'Delete a batch prediction job'
+---
+
+## Method
+
+```python
+client.batches.delete(
+    name: str,
+    config: Optional[DeleteBatchJobConfig] = None
+) -> DeleteResourceJob
+```
+
+Deletes a batch job from your project. This operation removes the job metadata but does not delete output files that have already been written.
+
+<ParamField path="name" type="string" required>
+  The resource name or ID of the batch job to delete:
+  - Vertex AI: `projects/{project}/locations/{location}/batchPredictionJobs/{job_id}` or just the `{job_id}` if project/location are set in the client
+  - Gemini API: `batches/{batch_id}` or just the `{batch_id}`
+</ParamField>
+
+<ParamField path="config" type="DeleteBatchJobConfig">
+  Optional configuration for the delete request
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="http_options" type="HttpOptions">
+      Custom HTTP options for the request
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="name" type="string">
+  The resource name of the delete operation
+</ResponseField>
+
+<ResponseField name="done" type="boolean">
+  Whether the deletion is complete
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error information if the deletion failed
+</ResponseField>
+
+## Usage
+
+### Delete a Batch Job
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Delete a batch job
+delete_op = client.batches.delete(name='123456789')
+
+print(f"Delete operation: {delete_op.name}")
+print(f"Complete: {delete_op.done}")
+```
+
+### Delete with Error Handling
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+job_name = '123456789'
+
+try:
+    # Check if job exists first
+    batch_job = client.batches.get(name=job_name)
+    print(f"Found job: {batch_job.name}")
+    
+    # Delete the job
+    delete_op = client.batches.delete(name=job_name)
+    
+    if delete_op.done:
+        print(f"Successfully deleted job: {job_name}")
+    else:
+        print(f"Delete operation in progress: {delete_op.name}")
+        
+except Exception as e:
+    print(f"Error deleting job: {e}")
+```
+
+### Delete Multiple Jobs
+
+```python
+from google.genai import types
+
+# Delete all failed jobs
+deleted_count = 0
+error_count = 0
+
+for batch_job in client.batches.list():
+    if batch_job.state == types.JobState.JOB_STATE_FAILED:
+        try:
+            client.batches.delete(name=batch_job.name)
+            print(f"Deleted: {batch_job.name}")
+            deleted_count += 1
+        except Exception as e:
+            print(f"Error deleting {batch_job.name}: {e}")
+            error_count += 1
+
+print(f"\nDeleted {deleted_count} jobs")
+if error_count > 0:
+    print(f"Failed to delete {error_count} jobs")
+```
+
+### Delete Old Jobs
+
+```python
+from datetime import datetime, timedelta
+from google.genai import types
+
+# Delete jobs older than 30 days
+thirty_days_ago = datetime.now() - timedelta(days=30)
+
+deleted_jobs = []
+for batch_job in client.batches.list():
+    job_time = datetime.fromisoformat(
+        batch_job.create_time.replace('Z', '+00:00')
+    )
+    
+    if job_time < thirty_days_ago:
+        # Only delete completed or failed jobs
+        if batch_job.state in [
+            types.JobState.JOB_STATE_SUCCEEDED,
+            types.JobState.JOB_STATE_FAILED,
+            types.JobState.JOB_STATE_CANCELLED
+        ]:
+            try:
+                client.batches.delete(name=batch_job.name)
+                deleted_jobs.append(batch_job.name)
+                print(f"Deleted old job: {batch_job.name}")
+            except Exception as e:
+                print(f"Could not delete {batch_job.name}: {e}")
+
+print(f"\nDeleted {len(deleted_jobs)} old jobs")
+```
+
+### Conditional Deletion
+
+```python
+from google.genai import types
+
+job_name = '123456789'
+
+# Check job state before deleting
+batch_job = client.batches.get(name=job_name)
+
+if batch_job.state in [
+    types.JobState.JOB_STATE_SUCCEEDED,
+    types.JobState.JOB_STATE_FAILED,
+    types.JobState.JOB_STATE_CANCELLED
+]:
+    # Safe to delete completed jobs
+    delete_op = client.batches.delete(name=job_name)
+    print(f"Deleted completed job: {job_name}")
+else:
+    print(f"Cannot delete job in state: {batch_job.state}")
+    print("Cancel the job first or wait for it to complete")
+```
+
+### Cleanup After Processing Results
+
+```python
+import json
+from google.cloud import storage
+from google.genai import types
+
+job_name = '123456789'
+batch_job = client.batches.get(name=job_name)
+
+if batch_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    # Download results first
+    gcs_uri = batch_job.dest.gcs_uri
+    print(f"Downloading results from {gcs_uri}...")
+    
+    # Download logic here...
+    results = []  # Your downloaded results
+    
+    # Save results locally
+    with open('batch_results.json', 'w') as f:
+        json.dump(results, f)
+    
+    print("Results saved locally")
+    
+    # Now safe to delete the job
+    client.batches.delete(name=job_name)
+    print(f"Deleted batch job: {job_name}")
+```
+
+### Bulk Cleanup
+
+```python
+from google.genai import types
+
+# Delete all completed jobs
+terminal_states = [
+    types.JobState.JOB_STATE_SUCCEEDED,
+    types.JobState.JOB_STATE_FAILED,
+    types.JobState.JOB_STATE_CANCELLED
+]
+
+print("Finding completed jobs...")
+completed_jobs = []
+
+for batch_job in client.batches.list():
+    if batch_job.state in terminal_states:
+        completed_jobs.append(batch_job)
+
+print(f"Found {len(completed_jobs)} completed jobs")
+
+if completed_jobs:
+    response = input(f"Delete all {len(completed_jobs)} jobs? (yes/no): ")
+    
+    if response.lower() == 'yes':
+        deleted = 0
+        for job in completed_jobs:
+            try:
+                client.batches.delete(name=job.name)
+                deleted += 1
+                print(f"Deleted {deleted}/{len(completed_jobs)}: {job.name}")
+            except Exception as e:
+                print(f"Error: {e}")
+        
+        print(f"\nSuccessfully deleted {deleted} jobs")
+    else:
+        print("Deletion cancelled")
+```
+
+## Important Notes
+
+<Warning>
+  Deleting a batch job is permanent and cannot be undone. Make sure to download any results before deletion.
+</Warning>
+
+- Deletion removes job metadata but NOT output files in GCS or BigQuery
+- You can delete jobs in any state, including running jobs
+- Deleting a running job does NOT cancel it - use [batches.cancel](/api/batches/cancel) first
+- Output files must be deleted separately if needed
+- Some deletion operations may be asynchronous (check `done` field)
+
+## What Gets Deleted
+
+**Deleted:**
+- Job metadata and configuration
+- Job history and logs
+- Reference to input/output locations
+
+**Not Deleted:**
+- Output files in GCS buckets
+- Output tables in BigQuery
+- Input files
+- Uploaded files in Files API
+
+## Error Handling
+
+The delete operation may fail in the following cases:
+
+- **Job not found**: The specified job name doesn't exist
+- **Permission denied**: Insufficient permissions to delete the job
+- **Network error**: Connection issues with the API
+
+```python
+try:
+    client.batches.delete(name=job_name)
+    print("Job deleted successfully")
+except ValueError as e:
+    print(f"Invalid job name: {e}")
+except PermissionError as e:
+    print(f"Permission denied: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## See Also
+
+- [batches.cancel](/api/batches/cancel) - Cancel a running job before deleting
+- [batches.get](/api/batches/get) - Check job status before deleting
+- [batches.list](/api/batches/list) - Find jobs to delete
+- [batches.create](/api/batches/create) - Create a new batch job

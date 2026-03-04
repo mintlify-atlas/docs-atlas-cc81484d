@@ -1,0 +1,168 @@
+---
+title: Tokenization
+description: Count tokens, compute tokens, and use local tokenizers
+---
+
+Tokenization is the process of breaking down text into tokens that models can process. Understanding token counts is important for managing context windows and API costs.
+
+## Count tokens
+
+Count the number of tokens in your content:
+
+```python
+response = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents='why is the sky blue?',
+)
+print(response)
+```
+
+The response includes:
+
+- **total_tokens** - Total number of tokens in the content
+- **cached_tokens** - Number of tokens from cached content (if applicable)
+
+## Compute tokens
+
+<Note>
+Compute tokens is only supported in Vertex AI.
+</Note>
+
+The `compute_tokens` method provides more detailed token information:
+
+```python
+response = client.models.compute_tokens(
+    model='gemini-2.5-flash',
+    contents='why is the sky blue?',
+)
+print(response)
+```
+
+This returns additional details about the tokenization, including the actual token IDs.
+
+## Async token counting
+
+Use async methods for non-blocking token counting:
+
+```python
+response = await client.aio.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents='why is the sky blue?',
+)
+print(response)
+```
+
+## Local tokenizer
+
+For offline token counting without making API calls, use the local tokenizer:
+
+```python
+import genai
+
+tokenizer = genai.LocalTokenizer(model_name='gemini-2.5-flash')
+result = tokenizer.count_tokens("What is your name?")
+print(result)
+```
+
+### Local compute tokens
+
+Compute detailed token information locally:
+
+```python
+import genai
+
+tokenizer = genai.LocalTokenizer(model_name='gemini-2.5-flash')
+result = tokenizer.compute_tokens("What is your name?")
+print(result)
+```
+
+The local tokenizer:
+
+- Works offline without API calls
+- Provides faster token counting
+- Useful for preprocessing and validation
+- Returns the same counts as the API
+
+## Token counting for different content types
+
+Count tokens for various content types:
+
+```python
+from google.genai import types
+
+# Text content
+response = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents='Hello, world!',
+)
+
+# Multimodal content
+response = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents=[
+        types.Part.from_text('Describe this image'),
+        types.Part.from_uri('gs://bucket/image.jpg', 'image/jpeg'),
+    ],
+)
+
+# Chat messages
+response = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents=[
+        types.Content(role='user', parts=[types.Part.from_text('Hello')]),
+        types.Content(role='model', parts=[types.Part.from_text('Hi there!')]),
+    ],
+)
+```
+
+## Managing context windows
+
+Use token counting to manage model context limits:
+
+```python
+MAX_TOKENS = 32000  # Example context window size
+
+# Count tokens before sending
+token_count = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents=long_text,
+)
+
+if token_count.total_tokens > MAX_TOKENS:
+    print(f"Content exceeds limit: {token_count.total_tokens} tokens")
+    # Truncate or split content
+else:
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents=long_text,
+    )
+```
+
+## Estimating costs
+
+Use token counts to estimate API costs:
+
+```python
+# Count input tokens
+input_count = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents=prompt,
+)
+
+print(f"Input tokens: {input_count.total_tokens}")
+
+# Generate content
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=prompt,
+)
+
+# Count output tokens
+output_count = client.models.count_tokens(
+    model='gemini-2.5-flash',
+    contents=response.text,
+)
+
+print(f"Output tokens: {output_count.total_tokens}")
+print(f"Total tokens: {input_count.total_tokens + output_count.total_tokens}")
+```

@@ -1,122 +1,185 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Google Gen AI Python SDK",
+  "theme": "sequoia",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#9a9d9e",
+    "light": "#34373b",
+    "dark": "#d2d3d4"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/googleapis/python-genai"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/googleapis/python-genai"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/client",
+              "concepts/types",
+              "concepts/authentication",
+              "concepts/models"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Content Generation",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/generate-content",
+              "guides/streaming",
+              "guides/multimodal",
+              "guides/system-instructions",
+              "guides/json-response"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Advanced Features",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/function-calling",
+              "guides/mcp-support",
+              "guides/chats",
+              "guides/safety-settings",
+              "guides/caching"
+            ]
+          },
+          {
+            "group": "Media Generation",
+            "pages": [
+              "guides/imagen",
+              "guides/veo"
+            ]
+          },
+          {
+            "group": "Files & Embeddings",
+            "pages": [
+              "guides/files",
+              "guides/embeddings",
+              "guides/tokenization"
+            ]
+          },
+          {
+            "group": "Fine-tuning & Batch",
+            "pages": [
+              "guides/tuning",
+              "guides/batch-prediction"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "guides/http-options",
+              "guides/proxy",
+              "guides/error-handling"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Client",
             "pages": [
-              "api-reference/introduction"
+              "api/client",
+              "api/async-client"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Models",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/models/generate-content",
+              "api/models/generate-images",
+              "api/models/generate-videos",
+              "api/models/embed-content",
+              "api/models/count-tokens",
+              "api/models/list"
+            ]
+          },
+          {
+            "group": "Chats",
+            "pages": [
+              "api/chats/create",
+              "api/chats/send-message"
+            ]
+          },
+          {
+            "group": "Files",
+            "pages": [
+              "api/files/upload",
+              "api/files/get",
+              "api/files/delete",
+              "api/files/list"
+            ]
+          },
+          {
+            "group": "Caches",
+            "pages": [
+              "api/caches/create",
+              "api/caches/get",
+              "api/caches/update",
+              "api/caches/delete",
+              "api/caches/list"
+            ]
+          },
+          {
+            "group": "Tunings",
+            "pages": [
+              "api/tunings/tune",
+              "api/tunings/get",
+              "api/tunings/list",
+              "api/tunings/cancel"
+            ]
+          },
+          {
+            "group": "Batches",
+            "pages": [
+              "api/batches/create",
+              "api/batches/get",
+              "api/batches/list",
+              "api/batches/delete"
+            ]
+          },
+          {
+            "group": "Interactions (Beta)",
+            "pages": [
+              "api/interactions/create",
+              "api/interactions/get"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/overview",
+              "api/types/content",
+              "api/types/part",
+              "api/types/config"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

@@ -1,0 +1,412 @@
+---
+title: "count_tokens / compute_tokens"
+description: "Count tokens in content before API calls"
+---
+
+## count_tokens
+
+Count the number of tokens in content without making a generation request.
+
+### Method Signature
+
+```python
+def count_tokens(
+    self,
+    *,
+    model: str,
+    contents: Union[ContentListUnion, ContentListUnionDict],
+    config: Optional[CountTokensConfig] = None,
+) -> CountTokensResponse
+```
+
+```python
+async def count_tokens(
+    self,
+    *,
+    model: str,
+    contents: Union[ContentListUnion, ContentListUnionDict],
+    config: Optional[CountTokensConfig] = None,
+) -> CountTokensResponse
+```
+
+### Description
+
+Counts the number of tokens in the given content. This is useful for:
+- Estimating API costs before making requests
+- Ensuring content fits within model token limits
+- Managing context windows
+- Optimizing prompt engineering
+
+Supports multimodal input for Gemini models.
+
+### Parameters
+
+<ParamField path="model" type="str" required>
+  The model to use for token counting. Different models have different tokenizers.
+  
+  Examples:
+  - `'gemini-2.0-flash'`
+  - `'gemini-2.0-flash-exp'`
+  - `'gemini-1.5-pro'`
+</ParamField>
+
+<ParamField path="contents" type="ContentListUnion" required>
+  The content to count tokens for.
+  
+  Can be:
+  - A string: `'What is your name?'`
+  - A list of Content objects
+  - A list of Part objects
+  - Multimodal content with text, images, video, and audio
+</ParamField>
+
+<ParamField path="config" type="CountTokensConfig">
+  Configuration for token counting.
+  
+  <Expandable title="config properties">
+    <ParamField path="system_instruction" type="Content">
+      System instructions to include in token count.
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="tools" type="list[Tool]">
+      Tools to include in token count.
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="generation_config" type="GenerationConfig">
+      Generation config to include in token count.
+      
+      *Vertex AI only*
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Response
+
+<ResponseField name="total_tokens" type="int">
+  Total number of tokens in the content
+</ResponseField>
+
+<ResponseField name="cached_content_token_count" type="int">
+  Number of tokens from cached content (if using context caching)
+</ResponseField>
+
+### Code Examples
+
+#### Basic Token Counting
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+response = client.models.count_tokens(
+    model='gemini-2.0-flash',
+    contents='What is your name?',
+)
+
+print(f"Total tokens: {response.total_tokens}")
+# Output: Total tokens: 5
+```
+
+#### Count Tokens in Conversation
+
+```python
+from google.genai import types
+
+conversation = [
+    types.Content(role='user', parts=[types.Part.from_text('Hello!')]),
+    types.Content(role='model', parts=[types.Part.from_text('Hi there! How can I help you?')]),
+    types.Content(role='user', parts=[types.Part.from_text('Tell me about Python')]),
+]
+
+response = client.models.count_tokens(
+    model='gemini-2.0-flash',
+    contents=conversation,
+)
+
+print(f"Conversation tokens: {response.total_tokens}")
+```
+
+#### Count Multimodal Tokens
+
+```python
+response = client.models.count_tokens(
+    model='gemini-2.0-flash',
+    contents=[
+        types.Part.from_text('Describe this image'),
+        types.Part.from_uri(
+            file_uri='gs://generativeai-downloads/images/scones.jpg',
+            mime_type='image/jpeg'
+        ),
+    ],
+)
+
+print(f"Multimodal tokens: {response.total_tokens}")
+# Includes both text and image tokens
+```
+
+#### With System Instructions (Vertex AI)
+
+```python
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+response = client.models.count_tokens(
+    model='gemini-2.0-flash',
+    contents='What is the weather?',
+    config=types.CountTokensConfig(
+        system_instruction='You are a helpful weather assistant.',
+        tools=[weather_tool],
+    ),
+)
+
+print(f"Total tokens (including system instruction and tools): {response.total_tokens}")
+```
+
+#### Check Before Generation
+
+```python
+def safe_generate(client, model, contents, max_tokens=30000):
+    """Generate content only if within token limit."""
+    token_response = client.models.count_tokens(
+        model=model,
+        contents=contents,
+    )
+    
+    if token_response.total_tokens > max_tokens:
+        raise ValueError(f"Content exceeds {max_tokens} tokens: {token_response.total_tokens}")
+    
+    return client.models.generate_content(
+        model=model,
+        contents=contents,
+    )
+
+# Use it
+try:
+    response = safe_generate(client, 'gemini-2.0-flash', 'What is AI?')
+    print(response.text)
+except ValueError as e:
+    print(f"Error: {e}")
+```
+
+---
+
+## compute_tokens
+
+Returns detailed token information including individual token IDs and strings.
+
+### Method Signature
+
+```python
+def compute_tokens(
+    self,
+    *,
+    model: str,
+    contents: Union[ContentListUnion, ContentListUnionDict],
+    config: Optional[ComputeTokensConfig] = None,
+) -> ComputeTokensResponse
+```
+
+```python
+async def compute_tokens(
+    self,
+    *,
+    model: str,
+    contents: Union[ContentListUnion, ContentListUnionDict],
+    config: Optional[ComputeTokensConfig] = None,
+) -> ComputeTokensResponse
+```
+
+### Description
+
+Given a list of contents, returns a corresponding `TokensInfo` containing the list of tokens and list of token IDs.
+
+**This method is only supported by Vertex AI API (not Gemini Developer API).**
+
+Useful for:
+- Understanding model tokenization
+- Debugging prompt engineering
+- Analyzing token distribution
+- Building custom tokenization tools
+
+### Parameters
+
+<ParamField path="model" type="str" required>
+  The model to use for tokenization.
+  
+  Examples:
+  - `'gemini-2.0-flash'`
+  - `'gemini-1.5-pro'`
+</ParamField>
+
+<ParamField path="contents" type="ContentListUnion" required>
+  The content to compute tokens for.
+</ParamField>
+
+<ParamField path="config" type="ComputeTokensConfig">
+  Configuration for token computation (reserved for future use)
+</ParamField>
+
+### Response
+
+<ResponseField name="tokens_info" type="list[TokensInfo]">
+  List of token information for each content.
+  
+  <Expandable title="TokensInfo properties">
+    <ResponseField name="tokens" type="list[bytes]">
+      List of token strings as bytes
+    </ResponseField>
+    
+    <ResponseField name="token_ids" type="list[str]">
+      List of token IDs
+    </ResponseField>
+    
+    <ResponseField name="role" type="str">
+      Role of the content (e.g., `'user'`, `'model'`)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Code Examples
+
+#### Basic Token Computation
+
+```python
+from google import genai
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+response = client.models.compute_tokens(
+    model='gemini-2.0-flash',
+    contents='What is your name?',
+)
+
+print(f"Tokens: {response.tokens_info[0].tokens}")
+print(f"Token IDs: {response.tokens_info[0].token_ids}")
+# Output:
+# Tokens: [b'What', b' is', b' your', b' name', b'?']
+# Token IDs: ['1841', '374', '574', '836', '30']
+```
+
+#### Analyze Tokenization
+
+```python
+text = "The quick brown fox jumps over the lazy dog."
+
+response = client.models.compute_tokens(
+    model='gemini-2.0-flash',
+    contents=text,
+)
+
+tokens_info = response.tokens_info[0]
+print(f"Original text: {text}")
+print(f"Number of tokens: {len(tokens_info.tokens)}")
+print("\nTokenization:")
+for token, token_id in zip(tokens_info.tokens, tokens_info.token_ids):
+    print(f"  '{token.decode('utf-8')}' -> ID: {token_id}")
+```
+
+#### Compare Tokenization Across Content
+
+```python
+from google.genai import types
+
+contents = [
+    types.Content(role='user', parts=[types.Part.from_text('Hello!')]),
+    types.Content(role='model', parts=[types.Part.from_text('Hi there!')]),
+]
+
+response = client.models.compute_tokens(
+    model='gemini-2.0-flash',
+    contents=contents,
+)
+
+for i, tokens_info in enumerate(response.tokens_info):
+    print(f"\nContent {i+1} ({tokens_info.role}):")
+    print(f"  Tokens: {len(tokens_info.tokens)}")
+    print(f"  Token breakdown: {[t.decode('utf-8') for t in tokens_info.tokens]}")
+```
+
+#### Analyze Special Characters
+
+```python
+special_text = "Hello! 你好 🌍"
+
+response = client.models.compute_tokens(
+    model='gemini-2.0-flash',
+    contents=special_text,
+)
+
+tokens_info = response.tokens_info[0]
+print("Token analysis for special characters:")
+for token, token_id in zip(tokens_info.tokens, tokens_info.token_ids):
+    try:
+        decoded = token.decode('utf-8')
+    except:
+        decoded = f"<binary: {token.hex()}>"
+    print(f"  '{decoded}' -> ID: {token_id}")
+```
+
+### Async Usage
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def count():
+    # count_tokens
+    response = await client.aio.models.count_tokens(
+        model='gemini-2.0-flash',
+        contents='What is AI?',
+    )
+    print(f"Tokens: {response.total_tokens}")
+
+asyncio.run(count())
+```
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+async def compute():
+    # compute_tokens (Vertex AI only)
+    response = await client.aio.models.compute_tokens(
+        model='gemini-2.0-flash',
+        contents='What is AI?',
+    )
+    print(f"Token IDs: {response.tokens_info[0].token_ids}")
+
+asyncio.run(compute())
+```
+
+## Comparison
+
+| Feature | count_tokens | compute_tokens |
+|---------|--------------|----------------|
+| **Availability** | Gemini API & Vertex AI | Vertex AI only |
+| **Returns** | Token count | Token strings + IDs |
+| **Use Case** | Quick count | Detailed analysis |
+| **Performance** | Faster | Slightly slower |
+| **System Instructions** | Vertex AI only | Not supported |
+
+## Notes
+
+- Token counts may vary slightly between model versions
+- Multimodal tokens (images, video, audio) are counted differently than text
+- Use `count_tokens` before generation to avoid exceeding limits
+- Use `compute_tokens` to understand how models tokenize your input
+- `compute_tokens` is only available on Vertex AI
+- System instructions and tools can be included in token count (Vertex AI only)
+- Context caching can significantly reduce token usage for repeated content
+
+## Related Methods
+
+- [generate_content](/api/models/generate-content) - Generate content
+- [embed_content](/api/models/embed-content) - Generate embeddings

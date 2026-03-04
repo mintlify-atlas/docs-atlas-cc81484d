@@ -1,0 +1,370 @@
+---
+title: "embed_content"
+description: "Generate embeddings for text and multimodal content"
+---
+
+## Method Signature
+
+```python
+def embed_content(
+    self,
+    *,
+    model: str,
+    contents: Union[ContentListUnion, ContentListUnionDict],
+    config: Optional[EmbedContentConfig] = None,
+) -> EmbedContentResponse
+```
+
+```python
+async def embed_content(
+    self,
+    *,
+    model: str,
+    contents: Union[ContentListUnion, ContentListUnionDict],
+    config: Optional[EmbedContentConfig] = None,
+) -> EmbedContentResponse
+```
+
+## Description
+
+Calculates embeddings (vector representations) for the given contents. Supports both text-only and multimodal embeddings depending on the model.
+
+Embeddings are useful for:
+- Semantic search and similarity matching
+- Content classification and clustering
+- Recommendation systems
+- Anomaly detection
+
+## Parameters
+
+<ParamField path="model" type="str" required>
+  The embedding model to use.
+  
+  **Text embedding models:**
+  - `'text-embedding-004'` - Latest text embedding model
+  - `'text-embedding-005'` - Newer text embedding model
+  - `'text-multilingual-embedding-002'` - Multilingual support
+  
+  **Multimodal embedding models (Vertex AI only):**
+  - `'multimodalembedding@001'`
+  - `'gemini-embedding-2-exp-11-2025'`
+</ParamField>
+
+<ParamField path="contents" type="ContentListUnion" required>
+  The contents to embed.
+  
+  Can be:
+  - A string: `'What is your name?'`
+  - A list of strings: `['text1', 'text2']`
+  - A list of Content objects for multimodal input
+  - A list of Part objects
+  
+  **Note:** Some Vertex AI models only support one content at a time.
+</ParamField>
+
+<ParamField path="config" type="EmbedContentConfig">
+  Configuration for embedding generation.
+  
+  <Expandable title="config properties">
+    <ParamField path="task_type" type="str">
+      The task type for the embeddings. Optimizes the model for specific use cases.
+      
+      Options:
+      - `'RETRIEVAL_QUERY'` - Query for searching documents
+      - `'RETRIEVAL_DOCUMENT'` - Document to be searched
+      - `'SEMANTIC_SIMILARITY'` - Comparing text similarity
+      - `'CLASSIFICATION'` - Text classification
+      - `'CLUSTERING'` - Grouping similar texts
+      - `'QUESTION_ANSWERING'` - QA systems
+      - `'FACT_VERIFICATION'` - Fact checking
+    </ParamField>
+    
+    <ParamField path="title" type="str">
+      Optional title for the document. Only valid with `task_type='RETRIEVAL_DOCUMENT'`.
+    </ParamField>
+    
+    <ParamField path="output_dimensionality" type="int">
+      Reduce embedding dimensions (e.g., `256`, `512`, `768`).
+      
+      Lower dimensions:
+      - Faster similarity search
+      - Less storage space
+      - May reduce quality slightly
+    </ParamField>
+    
+    <ParamField path="mime_type" type="str">
+      MIME type for multimodal content.
+      
+      Examples: `'image/jpeg'`, `'audio/wav'`
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="auto_truncate" type="bool">
+      Automatically truncate inputs that exceed token limits (default: true)
+      
+      *Vertex AI only*
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="embeddings" type="list[ContentEmbedding]">
+  List of embeddings for each input content.
+  
+  <Expandable title="ContentEmbedding properties">
+    <ResponseField name="values" type="list[float]">
+      The embedding vector as a list of floats.
+      
+      Typical dimensions:
+      - text-embedding-004: 768 dimensions
+      - Configurable with `output_dimensionality`
+    </ResponseField>
+    
+    <ResponseField name="statistics" type="EmbeddingStatistics">
+      Metadata about the embedding.
+      
+      <Expandable title="properties">
+        <ResponseField name="token_count" type="int">
+          Number of tokens in the input
+        </ResponseField>
+        
+        <ResponseField name="truncated" type="bool">
+          Whether input was truncated
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metadata" type="dict">
+  Additional metadata about the embedding response
+</ResponseField>
+
+## Code Examples
+
+### Basic Text Embedding
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+response = client.models.embed_content(
+    model='text-embedding-004',
+    contents='What is your name?'
+)
+
+embedding = response.embeddings[0].values
+print(f"Embedding dimension: {len(embedding)}")
+print(f"First 5 values: {embedding[:5]}")
+# Embedding dimension: 768
+# First 5 values: [0.013168523, -0.008711934, ...]
+```
+
+### Multiple Text Embeddings
+
+```python
+response = client.models.embed_content(
+    model='text-embedding-004',
+    contents=[
+        'What is your name?',
+        'What is your favorite color?',
+        'Where do you live?',
+    ]
+)
+
+for i, embedding in enumerate(response.embeddings):
+    print(f"Text {i+1}: {len(embedding.values)} dimensions")
+    print(f"  Tokens: {embedding.statistics.token_count}")
+    print(f"  Truncated: {embedding.statistics.truncated}")
+```
+
+### With Task Type and Reduced Dimensions
+
+```python
+from google.genai import types
+
+# Document embeddings for search
+doc_response = client.models.embed_content(
+    model='text-embedding-004',
+    contents=[
+        'Python is a high-level programming language.',
+        'JavaScript is used for web development.',
+    ],
+    config=types.EmbedContentConfig(
+        task_type='RETRIEVAL_DOCUMENT',
+        output_dimensionality=256,  # Reduce from 768 to 256
+    )
+)
+
+# Query embedding for search
+query_response = client.models.embed_content(
+    model='text-embedding-004',
+    contents='programming languages',
+    config=types.EmbedContentConfig(
+        task_type='RETRIEVAL_QUERY',
+        output_dimensionality=256,
+    )
+)
+
+print(f"Document embeddings: {len(doc_response.embeddings)}")
+print(f"Query dimension: {len(query_response.embeddings[0].values)}")
+```
+
+### Semantic Similarity Search
+
+```python
+import numpy as np
+from google.genai import types
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+# Embed documents
+documents = [
+    'The quick brown fox jumps over the lazy dog.',
+    'A fast auburn fox leaps above an idle canine.',
+    'Python is a programming language.',
+]
+
+doc_response = client.models.embed_content(
+    model='text-embedding-004',
+    contents=documents,
+    config=types.EmbedContentConfig(task_type='SEMANTIC_SIMILARITY')
+)
+
+# Embed query
+query = 'agile fox jumping'
+query_response = client.models.embed_content(
+    model='text-embedding-004',
+    contents=query,
+    config=types.EmbedContentConfig(task_type='SEMANTIC_SIMILARITY')
+)
+
+# Calculate similarities
+query_embedding = np.array(query_response.embeddings[0].values)
+for i, doc in enumerate(documents):
+    doc_embedding = np.array(doc_response.embeddings[i].values)
+    similarity = cosine_similarity(query_embedding, doc_embedding)
+    print(f"Document {i+1}: {similarity:.4f}")
+    print(f"  {doc[:50]}...")
+
+# Output:
+# Document 1: 0.8234
+#   The quick brown fox jumps over the lazy dog.
+# Document 2: 0.8156
+#   A fast auburn fox leaps above an idle canine.
+# Document 3: 0.3421
+#   Python is a programming language.
+```
+
+### Multimodal Embeddings (Vertex AI)
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+response = client.models.embed_content(
+    model='gemini-embedding-2-exp-11-2025',
+    contents=[
+        types.Part.from_uri(
+            file_uri='gs://generativeai-downloads/images/scones.jpg',
+            mime_type='image/jpeg',
+        ),
+    ],
+    config=types.EmbedContentConfig(
+        output_dimensionality=64,
+    )
+)
+
+print(f"Multimodal embedding: {len(response.embeddings[0].values)} dimensions")
+```
+
+### With Document Title
+
+```python
+response = client.models.embed_content(
+    model='text-embedding-004',
+    contents='Python is widely used in data science and machine learning applications.',
+    config=types.EmbedContentConfig(
+        task_type='RETRIEVAL_DOCUMENT',
+        title='Introduction to Python Programming',
+    )
+)
+
+embedding = response.embeddings[0].values
+print(f"Document embedding with title: {len(embedding)} dimensions")
+```
+
+### Batch Processing for Large Datasets
+
+```python
+import time
+
+def embed_large_dataset(client, texts, batch_size=100):
+    """Embed large datasets in batches."""
+    all_embeddings = []
+    
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        response = client.models.embed_content(
+            model='text-embedding-004',
+            contents=batch,
+            config={'output_dimensionality': 256}
+        )
+        all_embeddings.extend([emb.values for emb in response.embeddings])
+        
+        # Rate limiting
+        time.sleep(1)
+    
+    return all_embeddings
+
+# Use it
+texts = [f"Document {i}" for i in range(500)]
+embeddings = embed_large_dataset(client, texts)
+print(f"Generated {len(embeddings)} embeddings")
+```
+
+### Async Usage
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def embed_async():
+    response = await client.aio.models.embed_content(
+        model='text-embedding-004',
+        contents=[
+            'First text to embed',
+            'Second text to embed',
+            'Third text to embed',
+        ],
+        config={'output_dimensionality': 256}
+    )
+    
+    for i, emb in enumerate(response.embeddings):
+        print(f"Embedding {i+1}: {len(emb.values)} dimensions")
+
+asyncio.run(embed_async())
+```
+
+## Notes
+
+- Text embedding models support batch embedding of multiple texts
+- Some Vertex AI multimodal models only support one content at a time
+- Use `output_dimensionality` to reduce vector size for faster similarity search
+- Different `task_type` values optimize embeddings for specific use cases
+- Embeddings are normalized vectors suitable for cosine similarity
+- The `auto_truncate` option (Vertex AI) handles inputs exceeding token limits
+- For production RAG systems, consider using vector databases like Pinecone or Weaviate
+
+## Related Methods
+
+- [generate_content](/api/models/generate-content) - Generate text responses
+- [count_tokens](/api/models/count-tokens) - Count tokens before embedding

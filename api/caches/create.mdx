@@ -1,0 +1,356 @@
+---
+title: caches.create
+description: Create a cached content resource for efficient repeated queries
+---
+
+Creates a cached content resource that stores context (like documents, conversation history, or system instructions) for reuse across multiple requests. This reduces latency and costs for repeated queries against the same content.
+
+## Method Signature
+
+```python
+client.caches.create(
+    model: str,
+    config: Optional[CreateCachedContentConfigOrDict] = None
+) -> CachedContent
+```
+
+## Parameters
+
+<ParamField path="model" type="string" required>
+  The model to use for this cached content.
+  
+  Example: `'gemini-2.0-flash'` or `'gemini-1.5-pro'`
+</ParamField>
+
+<ParamField path="config" type="CreateCachedContentConfig">
+  Configuration for the cached content.
+  
+  Available options:
+  - `contents`: The content to cache (documents, conversation history, etc.)
+  - `system_instruction`: System instructions to cache
+  - `tools`: Tools configuration to cache
+  - `tool_config`: Tool configuration settings
+  - `ttl`: Time-to-live as a duration string (e.g., `"3600s"` for 1 hour)
+  - `expire_time`: Specific expiration timestamp
+  - `display_name`: Human-readable name for the cache
+  - `kms_key_name`: KMS encryption key (Vertex AI only)
+</ParamField>
+
+## Returns
+
+<ResponseField name="cached_content" type="CachedContent">
+  A CachedContent object containing:
+  - `name`: The resource name (e.g., `"cachedContents/abc123"`)
+  - `model`: The model name
+  - `display_name`: Human-readable name
+  - `create_time`: When the cache was created
+  - `update_time`: Last update time
+  - `expire_time`: When the cache will expire
+  - `usage_metadata`: Token usage information
+</ResponseField>
+
+## Examples
+
+### Basic Cache Creation
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key='your-api-key')
+
+# Create cached content
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [
+            types.Content(
+                role='user',
+                parts=[types.Part(text='This is important context to cache.')]
+            )
+        ],
+        'ttl': '3600s',  # Cache for 1 hour
+        'display_name': 'My Context Cache'
+    }
+)
+
+print(f"Cache created: {cached.name}")
+print(f"Expires: {cached.expire_time}")
+```
+
+### Cache with Document
+
+```python
+# Upload a document first
+file = client.files.upload(file='long_document.pdf')
+
+# Wait for processing
+import time
+while file.state == 'PROCESSING':
+    time.sleep(1)
+    file = client.files.get(name=file.name)
+
+# Create cache with the document
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [
+            types.Content(
+                role='user',
+                parts=[types.Part(
+                    file_data=types.FileData(file_uri=file.uri)
+                )]
+            )
+        ],
+        'ttl': '7200s',  # 2 hours
+        'display_name': 'Document Analysis Cache'
+    }
+)
+
+print(f"Document cached: {cached.name}")
+```
+
+### Cache with System Instructions
+
+```python
+# Cache system instructions and context together
+cached = client.caches.create(
+    model='gemini-1.5-pro',
+    config={
+        'system_instruction': 'You are a helpful coding assistant specialized in Python.',
+        'contents': [
+            types.Content(
+                role='user',
+                parts=[types.Part(text='Here is the company coding style guide...')]
+            )
+        ],
+        'ttl': '86400s',  # 24 hours
+        'display_name': 'Coding Assistant Context'
+    }
+)
+
+print(f"Cache with system instructions: {cached.name}")
+```
+
+### Use Cached Content in Generation
+
+```python
+# Create cache
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [
+            types.Content(
+                role='user',
+                parts=[types.Part(text='Large context document here...')]
+            )
+        ],
+        'ttl': '3600s'
+    }
+)
+
+# Use the cache in a generation request
+response = client.models.generate_content(
+    model=cached.name,  # Use the cache name as the model
+    contents='What are the key points from the cached document?'
+)
+
+print(response.text)
+print(f"Tokens from cache: {response.usage_metadata.cached_content_token_count}")
+```
+
+### Cache Multiple Documents
+
+```python
+# Upload multiple files
+files = [
+    client.files.upload(file='doc1.pdf'),
+    client.files.upload(file='doc2.pdf'),
+    client.files.upload(file='doc3.pdf')
+]
+
+# Wait for all to process
+for file in files:
+    while file.state == 'PROCESSING':
+        time.sleep(1)
+        file = client.files.get(name=file.name)
+
+# Create cache with all documents
+parts = [types.Part(file_data=types.FileData(file_uri=f.uri)) for f in files]
+
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [types.Content(role='user', parts=parts)],
+        'ttl': '7200s',
+        'display_name': 'Multi-Document Cache'
+    }
+)
+
+print(f"Cached {len(files)} documents")
+```
+
+### Set Specific Expiration Time
+
+```python
+from datetime import datetime, timedelta
+
+# Set explicit expiration time
+expire_at = datetime.now() + timedelta(hours=2)
+
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [
+            types.Content(
+                role='user',
+                parts=[types.Part(text='Context to cache')]
+            )
+        ],
+        'expire_time': expire_at.isoformat(),
+        'display_name': 'Timed Cache'
+    }
+)
+
+print(f"Expires at: {cached.expire_time}")
+```
+
+### Cache with Tools
+
+```python
+# Create cache with tool configuration
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': [
+            types.Content(
+                role='user',
+                parts=[types.Part(text='Database schema and context...')]
+            )
+        ],
+        'tools': [
+            types.Tool(
+                function_declarations=[
+                    types.FunctionDeclaration(
+                        name='query_database',
+                        description='Query the database',
+                        parameters={
+                            'type': 'object',
+                            'properties': {
+                                'query': {'type': 'string'}
+                            }
+                        }
+                    )
+                ]
+            )
+        ],
+        'ttl': '3600s',
+        'display_name': 'Database Context Cache'
+    }
+)
+
+print(f"Cache with tools: {cached.name}")
+```
+
+### Async Cache Creation
+
+```python
+import asyncio
+
+async def create_cache():
+    # Create cache asynchronously
+    cached = await client.aio.caches.create(
+        model='gemini-2.0-flash',
+        config={
+            'contents': [
+                types.Content(
+                    role='user',
+                    parts=[types.Part(text='Context to cache')]
+                )
+            ],
+            'ttl': '3600s'
+        }
+    )
+    print(f"Cache created: {cached.name}")
+    return cached
+
+asyncio.run(create_cache())
+```
+
+### Cache Conversation History
+
+```python
+# Cache a long conversation history
+conversation = [
+    types.Content(role='user', parts=[types.Part(text='First message')]),
+    types.Content(role='model', parts=[types.Part(text='First response')]),
+    types.Content(role='user', parts=[types.Part(text='Second message')]),
+    types.Content(role='model', parts=[types.Part(text='Second response')]),
+    # ... many more turns
+]
+
+cached = client.caches.create(
+    model='gemini-2.0-flash',
+    config={
+        'contents': conversation,
+        'ttl': '3600s',
+        'display_name': 'Conversation History Cache'
+    }
+)
+
+print(f"Cached {len(conversation)} conversation turns")
+```
+
+## Cost Optimization
+
+<Info>
+Caching is cost-effective when:
+- You make multiple requests with the same large context
+- The cached content is reused more than once
+- The context is large (thousands of tokens)
+
+Cached tokens are typically cheaper than regular input tokens, and subsequent requests using the cache only pay for new tokens.
+</Info>
+
+## TTL vs Expire Time
+
+<Note>
+You can specify expiration using either:
+- `ttl`: Duration from now (e.g., `"3600s"` for 1 hour)
+- `expire_time`: Specific timestamp
+
+Use `ttl` for relative expiration, `expire_time` for absolute expiration. Don't specify both.
+</Note>
+
+## Error Handling
+
+```python
+try:
+    cached = client.caches.create(
+        model='gemini-2.0-flash',
+        config={
+            'contents': [types.Content(role='user', parts=[types.Part(text='Context')])],
+            'ttl': '3600s'
+        }
+    )
+    print(f"Success: {cached.name}")
+except Exception as e:
+    print(f"Failed to create cache: {e}")
+```
+
+## API Availability
+
+<Note>
+This method is available in both **Gemini API** and **Vertex AI**.
+
+**Vertex AI differences:**
+- Supports `kms_key_name` for encryption
+- Some tool options may differ
+</Note>
+
+## Related Methods
+
+- [caches.get](/api/caches/get) - Retrieve cache metadata
+- [caches.update](/api/caches/update) - Update cache expiration
+- [caches.delete](/api/caches/delete) - Delete a cache
+- [caches.list](/api/caches/list) - List all caches

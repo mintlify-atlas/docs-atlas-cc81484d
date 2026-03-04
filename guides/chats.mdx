@@ -1,0 +1,182 @@
+---
+title: Multi-Turn Conversations
+description: Create chat sessions to have multi-turn conversations with Gemini models
+---
+
+Chats enable multi-turn conversations where the model remembers previous messages and can build on the conversation context. This is perfect for building chatbots, assistants, and interactive applications.
+
+## Creating a Chat Session
+
+Create a chat session using `client.chats.create()` to start a conversation:
+
+```python
+chat = client.chats.create(model='gemini-2.5-flash')
+```
+
+## Synchronous Non-Streaming
+
+Send messages and receive complete responses:
+
+```python
+chat = client.chats.create(model='gemini-2.5-flash')
+response = chat.send_message('tell me a story')
+print(response.text)
+
+response = chat.send_message('summarize the story you told me in 1 sentence')
+print(response.text)
+```
+
+Each call to `send_message()` retains the conversation context, so the model can reference previous messages.
+
+## Synchronous Streaming
+
+Stream responses as they're generated for real-time user experiences:
+
+```python
+chat = client.chats.create(model='gemini-2.5-flash')
+for chunk in chat.send_message_stream('tell me a story'):
+    print(chunk.text, end='')
+```
+
+This is ideal for displaying responses progressively in chat interfaces.
+
+## Asynchronous Non-Streaming
+
+Use async/await for non-blocking chat operations:
+
+```python
+import asyncio
+
+async def chat_example():
+    chat = client.aio.chats.create(model='gemini-2.5-flash')
+    response = await chat.send_message('tell me a story')
+    print(response.text)
+    
+    response = await chat.send_message('summarize the story you told me in 1 sentence')
+    print(response.text)
+
+asyncio.run(chat_example())
+```
+
+## Asynchronous Streaming
+
+Combine async operations with streaming for the best performance:
+
+```python
+import asyncio
+
+async def chat_stream_example():
+    chat = client.aio.chats.create(model='gemini-2.5-flash')
+    async for chunk in await chat.send_message_stream('tell me a story'):
+        print(chunk.text, end='')
+
+asyncio.run(chat_stream_example())
+```
+
+## Context Retention
+
+Chat sessions automatically maintain conversation history. The model can:
+
+- Reference previous messages
+- Build on earlier responses
+- Maintain consistency across turns
+- Use pronouns and context from prior exchanges
+
+```python
+chat = client.chats.create(model='gemini-2.5-flash')
+
+# First turn
+response = chat.send_message('My name is Alice and I love hiking.')
+print(response.text)  # Model acknowledges the information
+
+# Second turn - model remembers your name
+response = chat.send_message('What was my name again?')
+print(response.text)  # "Your name is Alice"
+
+# Third turn - model remembers your interests
+response = chat.send_message('Recommend an activity for me.')
+print(response.text)  # Model suggests hiking-related activities
+```
+
+## Configuration Options
+
+You can configure chat sessions with the same options as `generate_content`:
+
+```python
+from google.genai import types
+
+chat = client.chats.create(
+    model='gemini-2.5-flash',
+    config=types.GenerateContentConfig(
+        temperature=0.7,
+        max_output_tokens=1024,
+        system_instruction='You are a helpful assistant that speaks concisely.',
+    )
+)
+
+response = chat.send_message('tell me about Python')
+print(response.text)
+```
+
+## Accessing Chat History
+
+You can access the full conversation history from a chat session:
+
+```python
+chat = client.chats.create(model='gemini-2.5-flash')
+chat.send_message('Hello!')
+chat.send_message('How are you?')
+
+# Access the conversation history
+for message in chat.history:
+    print(f"{message.role}: {message.parts[0].text}")
+```
+
+## Best Practices
+
+- **Use streaming** for better user experience in chat interfaces
+- **Use async** for handling multiple concurrent chat sessions
+- **Set system instructions** to define the assistant's personality and behavior
+- **Monitor context length** - long conversations may exceed token limits
+- **Create new sessions** when starting a new topic or conversation
+
+## Common Patterns
+
+### Chat with History Clearing
+
+```python
+chat = client.chats.create(model='gemini-2.5-flash')
+
+# Have a conversation
+chat.send_message('Remember this number: 42')
+chat.send_message('What number did I tell you?')  # Returns 42
+
+# Start fresh by creating a new chat session
+chat = client.chats.create(model='gemini-2.5-flash')
+chat.send_message('What number did I tell you?')  # No memory of 42
+```
+
+### Chat with Function Calling
+
+```python
+from google.genai import types
+
+def get_weather(location: str) -> str:
+    """Get the current weather for a location."""
+    return "sunny"
+
+chat = client.chats.create(
+    model='gemini-2.5-flash',
+    config=types.GenerateContentConfig(
+        tools=[get_weather],
+    )
+)
+
+response = chat.send_message('What is the weather in Boston?')
+print(response.text)
+
+response = chat.send_message('How about in New York?')
+print(response.text)
+```
+
+The chat session maintains context while supporting function calling across multiple turns.

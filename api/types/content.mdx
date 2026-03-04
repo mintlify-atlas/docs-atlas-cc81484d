@@ -1,0 +1,302 @@
+---
+title: Content Types
+description: Types for representing multi-part messages and content
+---
+
+## Overview
+
+Content types represent messages exchanged with the model. Each message can contain multiple parts with different media types.
+
+## Content
+
+Base class for multi-part message content.
+
+### Fields
+
+<ParamField path="parts" type="list[Part]">
+  List of parts that constitute a single message. Each part may have a different IANA MIME type.
+</ParamField>
+
+<ParamField path="role" type="str">
+  The producer of the content. Must be either 'user' or 'model'. Defaults to 'user' if not set.
+</ParamField>
+
+### Example
+
+```python
+from google.genai.types import Content, Part
+
+content = Content(
+    parts=[
+        Part.from_text(text="What's in this image?"),
+        Part.from_uri(file_uri="gs://bucket/image.jpg", mime_type="image/jpeg")
+    ],
+    role="user"
+)
+```
+
+## UserContent
+
+Convenience class for creating user messages.
+
+### Constructor
+
+```python
+UserContent(parts: Union[PartUnionDict, list[PartUnionDict], list[Part]])
+```
+
+Automatically sets `role="user"` and cannot be changed.
+
+### Examples
+
+```python
+from google.genai.types import UserContent, Part
+
+# Simple text
+user_content = UserContent("Why is the sky blue?")
+
+# Single Part
+user_content = UserContent(
+    Part.from_uri(file_uri="gs://bucket/file.txt", mime_type="text/plain")
+)
+
+# Multiple parts
+user_content = UserContent([
+    "Analyze this image:",
+    Part.from_bytes(data=image_bytes, mime_type="image/png")
+])
+
+# List of Part objects
+parts = [
+    Part.from_text(text="Question 1"),
+    Part.from_text(text="Question 2")
+]
+user_content = UserContent(parts)
+```
+
+## ModelContent
+
+Convenience class for creating model messages.
+
+### Constructor
+
+```python
+ModelContent(parts: Union[PartUnionDict, list[PartUnionDict], list[Part]])
+```
+
+Automatically sets `role="model"` and cannot be changed.
+
+### Examples
+
+```python
+from google.genai.types import ModelContent, Part
+
+# Simple text response
+model_content = ModelContent("The sky appears blue because...")
+
+# Response with function call
+model_content = ModelContent(
+    Part.from_function_call(name="get_weather", args={"location": "London"})
+)
+
+# Multiple response parts
+model_content = ModelContent([
+    "Here's the code:",
+    Part.from_executable_code(
+        code="print('Hello')",
+        language=Language.PYTHON
+    )
+])
+```
+
+## Part Union Types
+
+### PartUnionDict
+
+Accepts various input formats:
+
+```python
+PartUnionDict = Union[
+    str,                    # Text string
+    Part,                   # Part object
+    PartDict,              # Part dictionary
+    File,                  # File object
+    PIL.Image.Image,       # PIL Image
+]
+```
+
+### ContentUnion
+
+```python
+ContentUnion = Union[
+    str,                    # Simple text
+    Content,               # Content object
+    ContentDict,           # Content dictionary
+    list[Part],            # List of parts
+    list[PartUnionDict],   # List of part unions
+]
+```
+
+## Content Construction Patterns
+
+### Text Only
+
+```python
+# All equivalent
+content1 = UserContent("Hello")
+content2 = Content(parts=[Part.from_text(text="Hello")], role="user")
+content3 = Content(parts=[Part(text="Hello")], role="user")
+```
+
+### Multimodal Content
+
+```python
+from google.genai.types import UserContent, Part
+
+# Image + text
+content = UserContent([
+    "What's in this image?",
+    Part.from_uri(
+        file_uri="gs://bucket/image.jpg",
+        mime_type="image/jpeg"
+    )
+])
+
+# Video + text with metadata
+content = UserContent([
+    "Describe this video",
+    Part(
+        file_data=FileData(
+            file_uri="gs://bucket/video.mp4",
+            mime_type="video/mp4"
+        ),
+        video_metadata=VideoMetadata(
+            start_offset="00:00:10",
+            end_offset="00:00:30",
+            fps=1.0
+        )
+    )
+])
+
+# Audio + text
+content = UserContent([
+    "Transcribe this audio",
+    Part.from_bytes(
+        data=audio_bytes,
+        mime_type="audio/wav"
+    )
+])
+```
+
+### Function Calling
+
+```python
+from google.genai.types import ModelContent, UserContent, Part
+
+# Model makes function call
+model_call = ModelContent(
+    Part.from_function_call(
+        name="get_weather",
+        args={"location": "San Francisco", "unit": "celsius"}
+    )
+)
+
+# User provides function response
+user_response = UserContent(
+    Part.from_function_response(
+        name="get_weather",
+        response={"temperature": 18, "condition": "sunny"}
+    )
+)
+```
+
+### Chat History
+
+```python
+from google.genai.types import UserContent, ModelContent
+
+history = [
+    UserContent("What is 2+2?"),
+    ModelContent("2+2 equals 4."),
+    UserContent("What about 3+3?"),
+    ModelContent("3+3 equals 6."),
+]
+
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents=history + [UserContent("What about 4+4?")]
+)
+```
+
+## Dict Representations
+
+### ContentDict
+
+```python
+from google.genai.types import ContentDict, PartDict
+
+content_dict: ContentDict = {
+    "parts": [
+        {"text": "Hello"},
+        {"inline_data": {"data": b"...", "mime_type": "image/png"}}
+    ],
+    "role": "user"
+}
+```
+
+### PartDict
+
+```python
+from google.genai.types import PartDict
+
+text_part: PartDict = {"text": "Hello"}
+
+image_part: PartDict = {
+    "inline_data": {
+        "data": image_bytes,
+        "mime_type": "image/jpeg"
+    }
+}
+
+file_part: PartDict = {
+    "file_data": {
+        "file_uri": "gs://bucket/file.pdf",
+        "mime_type": "application/pdf"
+    }
+}
+```
+
+## Media Resolution
+
+Control tokenization quality for media:
+
+```python
+from google.genai.types import Part, PartMediaResolutionLevel
+
+# Using enum
+part = Part.from_uri(
+    file_uri="gs://bucket/image.jpg",
+    mime_type="image/jpeg",
+    media_resolution=PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH
+)
+
+# Using string
+part = Part.from_uri(
+    file_uri="gs://bucket/image.jpg",
+    mime_type="image/jpeg",
+    media_resolution="MEDIA_RESOLUTION_HIGH"
+)
+
+# Using dict with num_tokens
+part = Part.from_uri(
+    file_uri="gs://bucket/video.mp4",
+    mime_type="video/mp4",
+    media_resolution={"num_tokens": 512}
+)
+```
+
+## See Also
+
+- [Part Class](/api/types/part) - Part factory methods and details
+- [Types Overview](/api/types/overview) - Type system overview
+- [Client Reference](/api/client) - Using content with the client

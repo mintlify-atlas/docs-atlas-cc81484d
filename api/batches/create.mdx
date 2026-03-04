@@ -1,0 +1,273 @@
+---
+title: 'batches.create'
+description: 'Create a new batch prediction job'
+---
+
+## Method
+
+```python
+client.batches.create(
+    model: str,
+    src: BatchJobSource,
+    config: Optional[CreateBatchJobConfig] = None
+) -> BatchJob
+```
+
+Creates a batch prediction job for processing multiple requests asynchronously. Batch jobs are ideal for high-volume, non-latency-sensitive workloads.
+
+<ParamField path="model" type="string" required>
+  The model to use for the batch job. Example: `gemini-2.0-flash-001`
+</ParamField>
+
+<ParamField path="src" type="BatchJobSource" required>
+  The source of the batch job data:
+  
+  <Expandable title="Source Options">
+    <ParamField path="gcs_uri" type="string | list[string]">
+      GCS bucket path(s) to input data (Vertex AI only). Example: `gs://my-bucket/input.jsonl`
+    </ParamField>
+    
+    <ParamField path="bigquery_uri" type="string">
+      BigQuery table URI (Vertex AI only). Format: `bq://projectId.datasetId.tableId`
+    </ParamField>
+    
+    <ParamField path="file_name" type="string">
+      File name from Files API (Gemini API only). Example: `files/my-input-file`
+    </ParamField>
+    
+    <ParamField path="inlined_requests" type="list[InlinedRequest]">
+      List of inline requests (Gemini API only)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="config" type="CreateBatchJobConfig">
+  Configuration options for the batch job
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="display_name" type="string">
+      Display name for the batch job
+    </ParamField>
+    
+    <ParamField path="dest" type="BatchJobDestination">
+      Output destination configuration (Vertex AI only):
+      - `gcs_uri`: GCS bucket path for output
+      - `bigquery_uri`: BigQuery table for output
+      - `format`: Output format (`jsonl` or `bigquery`)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="name" type="string">
+  The resource name of the batch job
+</ResponseField>
+
+<ResponseField name="state" type="JobState">
+  Current state of the batch job:
+  - `JOB_STATE_QUEUED`: Job is queued
+  - `JOB_STATE_PENDING`: Job is pending
+  - `JOB_STATE_RUNNING`: Job is running
+  - `JOB_STATE_SUCCEEDED`: Job completed successfully
+  - `JOB_STATE_FAILED`: Job failed
+  - `JOB_STATE_CANCELLED`: Job was cancelled
+</ResponseField>
+
+<ResponseField name="create_time" type="string">
+  Timestamp when the job was created
+</ResponseField>
+
+<ResponseField name="start_time" type="string">
+  Timestamp when the job started processing
+</ResponseField>
+
+<ResponseField name="end_time" type="string">
+  Timestamp when the job completed
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The model being used for the batch job
+</ResponseField>
+
+<ResponseField name="dest" type="BatchJobDestination">
+  Destination information for the output
+</ResponseField>
+
+<ResponseField name="completion_stats" type="object">
+  Statistics about completed requests (Vertex AI only)
+</ResponseField>
+
+## Usage
+
+### Create Batch Job from GCS (Vertex AI)
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    vertexai=True,
+    project='my-project',
+    location='us-central1'
+)
+
+# Create batch job with GCS input/output
+batch_job = client.batches.create(
+    model='gemini-2.0-flash-001',
+    src=types.BatchJobSource(
+        gcs_uri='gs://my-bucket/input/requests.jsonl'
+    ),
+    config=types.CreateBatchJobConfig(
+        display_name='My Batch Job',
+        dest=types.BatchJobDestination(
+            gcs_uri='gs://my-bucket/output/',
+            format='jsonl'
+        )
+    )
+)
+
+print(f"Batch job created: {batch_job.name}")
+print(f"State: {batch_job.state}")
+```
+
+### Create Batch Job from File (Gemini API)
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key='your-api-key')
+
+# Upload file first
+with open('requests.jsonl', 'rb') as f:
+    uploaded_file = client.files.upload(file=f)
+
+# Create batch job
+batch_job = client.batches.create(
+    model='gemini-2.0-flash-001',
+    src=types.BatchJobSource(
+        file_name=uploaded_file.name
+    ),
+    config=types.CreateBatchJobConfig(
+        display_name='Gemini Batch Job'
+    )
+)
+
+print(f"Job created: {batch_job.name}")
+```
+
+### With Inline Requests (Gemini API)
+
+```python
+from google.genai import types
+
+# Create batch job with inline requests
+batch_job = client.batches.create(
+    model='gemini-2.0-flash-001',
+    src=types.BatchJobSource(
+        inlined_requests=[
+            types.InlinedRequest(
+                contents='What is the capital of France?',
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                    max_output_tokens=100
+                )
+            ),
+            types.InlinedRequest(
+                contents='Explain quantum computing',
+                config=types.GenerateContentConfig(
+                    temperature=0.5
+                )
+            )
+        ]
+    )
+)
+
+print(f"Batch job with inline requests: {batch_job.name}")
+```
+
+### Monitor Job Progress
+
+```python
+import time
+from google.genai import types
+
+# Create batch job
+batch_job = client.batches.create(
+    model='gemini-2.0-flash-001',
+    src='gs://my-bucket/input.jsonl',
+    config=types.CreateBatchJobConfig(
+        dest=types.BatchJobDestination(
+            gcs_uri='gs://my-bucket/output/'
+        )
+    )
+)
+
+print(f"Job created: {batch_job.name}")
+
+# Poll until completion
+while batch_job.state in [
+    types.JobState.JOB_STATE_QUEUED,
+    types.JobState.JOB_STATE_PENDING,
+    types.JobState.JOB_STATE_RUNNING
+]:
+    print(f"Status: {batch_job.state}")
+    time.sleep(60)
+    batch_job = client.batches.get(name=batch_job.name)
+
+if batch_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    print("Batch job completed successfully!")
+    print(f"Output location: {batch_job.dest.gcs_uri}")
+    if batch_job.completion_stats:
+        print(f"Stats: {batch_job.completion_stats}")
+else:
+    print(f"Job failed with state: {batch_job.state}")
+```
+
+### BigQuery Input/Output (Vertex AI)
+
+```python
+from google.genai import types
+
+# Create batch job with BigQuery
+batch_job = client.batches.create(
+    model='gemini-2.0-flash-001',
+    src=types.BatchJobSource(
+        bigquery_uri='bq://my-project.my_dataset.input_table'
+    ),
+    config=types.CreateBatchJobConfig(
+        display_name='BigQuery Batch',
+        dest=types.BatchJobDestination(
+            bigquery_uri='bq://my-project.my_dataset.output_table',
+            format='bigquery'
+        )
+    )
+)
+
+print(f"BigQuery batch job: {batch_job.name}")
+```
+
+## Input Format
+
+For file-based inputs (GCS or Files API), use JSONL format with one request per line:
+
+```json
+{"request": {"contents": [{"parts": [{"text": "What is AI?"}]}]}}
+{"request": {"contents": [{"parts": [{"text": "Explain machine learning"}]}]}}
+{"request": {"contents": [{"parts": [{"text": "What is deep learning?"}]}]}}
+```
+
+## Notes
+
+- Batch jobs process requests asynchronously and may take minutes to hours
+- Gemini API has lower quotas than Vertex AI for batch processing
+- Results are written to the specified destination upon completion
+- Monitor job status using [batches.get](/api/batches/get)
+- You can cancel running jobs using [batches.cancel](/api/batches/cancel)
+
+## See Also
+
+- [batches.get](/api/batches/get) - Check batch job status
+- [batches.list](/api/batches/list) - List all batch jobs
+- [batches.delete](/api/batches/delete) - Delete a batch job

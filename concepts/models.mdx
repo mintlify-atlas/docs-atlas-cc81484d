@@ -1,0 +1,472 @@
+---
+title: 'Models'
+description: 'Learn about available Gemini models and how to select the right one for your use case'
+---
+
+## Overview
+
+The Google Gen AI SDK provides access to various Gemini models through both the Gemini Developer API and Vertex AI. Each model has different capabilities, performance characteristics, and pricing.
+
+## Model Naming Convention
+
+When calling models, use the model name string:
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Hello, world!'
+)
+```
+
+## Available Models
+
+### Gemini 2.5 Flash
+
+**Model ID:** `gemini-2.5-flash`
+
+The latest and most capable Gemini model for fast, versatile performance.
+
+- **Best for:** Most use cases, balanced performance and cost
+- **Strengths:** Fast response times, high-quality outputs, multimodal capabilities
+- **Context Window:** Large context window for long documents
+- **Modalities:** Text, images, audio, video
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Explain quantum computing'
+)
+```
+
+### Gemini 2.0 Flash
+
+**Model ID:** `gemini-2.0-flash`
+
+Previous generation flash model, still highly capable.
+
+- **Best for:** General purpose tasks
+- **Strengths:** Fast inference, good quality
+- **Context Window:** Large
+- **Modalities:** Text, images, audio, video
+
+### Gemini 2.5 Pro (Preview)
+
+**Model ID:** `gemini-2.5-pro`
+
+Advanced model with enhanced reasoning capabilities.
+
+- **Best for:** Complex reasoning, analysis, and specialized tasks
+- **Strengths:** Superior reasoning, deep analysis
+- **Context Window:** Very large
+- **Modalities:** Text, images, audio, video
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.5-pro',
+    contents='Analyze this complex business scenario...'
+)
+```
+
+### Gemini 2.5 Flash Image
+
+**Model ID:** `gemini-2.5-flash-image`
+
+Specialized model for image generation.
+
+- **Best for:** Generating images from text descriptions
+- **Strengths:** High-quality image generation
+- **Input:** Text prompts
+- **Output:** Images
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash-image',
+    contents='A futuristic city at sunset',
+    config=types.GenerateContentConfig(
+        response_modalities=['IMAGE'],
+        image_config=types.ImageConfig(aspect_ratio='16:9')
+    )
+)
+```
+
+### Embedding Models
+
+#### Text Embedding
+
+**Model ID:** `text-embedding-004`
+
+Latest text embedding model for semantic search and retrieval.
+
+```python
+response = client.models.embed_content(
+    model='text-embedding-004',
+    contents='Machine learning is a subset of artificial intelligence'
+)
+embedding = response.embeddings[0].values
+```
+
+#### Multimodal Embedding
+
+**Model ID:** `multimodalembedding@001` (Vertex AI only)
+
+Embed text, images, and video for multimodal applications.
+
+```python
+response = client.models.embed_content(
+    model='multimodalembedding@001',
+    contents=['Text to embed', image_part]
+)
+```
+
+### Image Generation Models
+
+#### Imagen 4.0
+
+**Model ID:** `imagen-4.0-generate-001`
+
+Latest image generation model with improved quality and control.
+
+```python
+from google.genai import types
+
+response = client.models.generate_images(
+    model='imagen-4.0-generate-001',
+    prompt='A serene mountain landscape at dawn',
+    config=types.GenerateImagesConfig(
+        number_of_images=4,
+        aspect_ratio='16:9'
+    )
+)
+```
+
+#### Imagen 4.0 Upscale (Vertex AI only)
+
+**Model ID:** `imagen-4.0-upscale-preview`
+
+Upscale images to higher resolutions.
+
+```python
+response = client.models.upscale_image(
+    model='imagen-4.0-upscale-preview',
+    image=original_image,
+    upscale_factor='x2'
+)
+```
+
+#### Imagen 3.0 Edit (Vertex AI only)
+
+**Model ID:** `imagen-3.0-capability-001`
+
+Edit existing images with text prompts.
+
+```python
+from google.genai import types
+
+response = client.models.edit_image(
+    model='imagen-3.0-capability-001',
+    prompt='Add a rainbow in the sky',
+    reference_images=[image],
+    config=types.EditImageConfig(
+        edit_mode='EDIT_MODE_INPAINT_INSERTION'
+    )
+)
+```
+
+### Video Generation Models
+
+#### Veo 3.1
+
+**Model ID:** `veo-3.1-generate-preview`
+
+State-of-the-art video generation model.
+
+```python
+from google.genai import types
+import time
+
+operation = client.models.generate_videos(
+    model='veo-3.1-generate-preview',
+    prompt='A cat driving a sports car through a neon city',
+    config=types.GenerateVideosConfig(
+        number_of_videos=1,
+        duration_seconds=5
+    )
+)
+
+# Poll for completion
+while not operation.done:
+    time.sleep(20)
+    operation = client.operations.get(operation)
+
+video = operation.response.generated_videos[0].video
+```
+
+## Model Selection Guide
+
+### By Use Case
+
+| Use Case | Recommended Model | Reason |
+|----------|-------------------|--------|
+| General Q&A | `gemini-2.5-flash` | Fast, cost-effective, high quality |
+| Complex reasoning | `gemini-2.5-pro` | Superior analytical capabilities |
+| Long documents | `gemini-2.5-flash` | Large context window |
+| Code generation | `gemini-2.5-flash` | Fast, accurate code generation |
+| Image generation | `gemini-2.5-flash-image` or `imagen-4.0-generate-001` | Specialized for images |
+| Video generation | `veo-3.1-generate-preview` | Latest video generation |
+| Embeddings | `text-embedding-004` | Latest embedding model |
+
+### By Performance Characteristics
+
+<Note>
+  **Flash models** prioritize speed and cost-efficiency while maintaining high quality.
+  They're ideal for most production use cases.
+</Note>
+
+<Note>
+  **Pro models** prioritize quality and reasoning capabilities. Use them for complex
+  analytical tasks, research, and scenarios requiring deep understanding.
+</Note>
+
+## Listing Available Models
+
+Retrieve a list of available base models:
+
+```python
+for model in client.models.list():
+    print(f"{model.name}: {model.description}")
+```
+
+With pagination:
+
+```python
+pager = client.models.list(config={'page_size': 10})
+print(pager.page_size)
+print(pager[0])
+pager.next_page()
+print(pager[0])
+```
+
+### Async Listing
+
+```python
+async for model in await client.aio.models.list():
+    print(model.name)
+```
+
+## Getting Model Information
+
+Retrieve details about a specific model:
+
+```python
+model_info = client.models.get(model='gemini-2.5-flash')
+
+print(f"Name: {model_info.name}")
+print(f"Description: {model_info.description}")
+print(f"Input token limit: {model_info.input_token_limit}")
+print(f"Output token limit: {model_info.output_token_limit}")
+```
+
+## Tuned Models
+
+### Creating a Tuned Model (Vertex AI only)
+
+Fine-tune a base model on your own data:
+
+```python
+from google.genai import types
+
+tuning_job = client.tunings.tune(
+    base_model='gemini-2.5-flash',
+    training_dataset=types.TuningDataset(
+        gcs_uri='gs://your-bucket/training-data.jsonl'
+    ),
+    config=types.CreateTuningJobConfig(
+        epoch_count=3,
+        tuned_model_display_name='my-custom-model'
+    )
+)
+
+print(f"Tuning job: {tuning_job.name}")
+```
+
+### Using a Tuned Model
+
+Once training is complete, use your tuned model:
+
+```python
+import time
+
+# Wait for training to complete
+while tuning_job.state not in ['JOB_STATE_SUCCEEDED', 'JOB_STATE_FAILED']:
+    time.sleep(30)
+    tuning_job = client.tunings.get(name=tuning_job.name)
+
+if tuning_job.state == 'JOB_STATE_SUCCEEDED':
+    # Use the tuned model
+    response = client.models.generate_content(
+        model=tuning_job.tuned_model.endpoint,
+        contents='Your prompt here'
+    )
+    print(response.text)
+```
+
+### Listing Tuned Models
+
+Retrieve your custom tuned models:
+
+```python
+# List only tuned models (exclude base models)
+for model in client.models.list(config={'page_size': 10, 'query_base': False}):
+    print(f"Tuned model: {model.name}")
+```
+
+### Updating a Tuned Model
+
+```python
+from google.genai import types
+
+model = client.models.update(
+    model='projects/PROJECT_ID/locations/LOCATION/models/MODEL_ID',
+    config=types.UpdateModelConfig(
+        display_name='Updated Model Name',
+        description='Updated description'
+    )
+)
+```
+
+## Model Capabilities
+
+### Multimodal Input
+
+Most Gemini models support multiple input modalities:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=[
+        'What is in this image?',
+        types.Part.from_uri(
+            file_uri='gs://bucket/image.jpg',
+            mime_type='image/jpeg'
+        )
+    ]
+)
+```
+
+### Multimodal Output
+
+Some models can generate multimodal outputs:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash-image',
+    contents='Generate a diagram of the solar system',
+    config=types.GenerateContentConfig(
+        response_modalities=['IMAGE']
+    )
+)
+
+for part in response.parts:
+    if part.inline_data:
+        image = part.as_image()
+        image.show()
+```
+
+### Function Calling
+
+All Gemini text models support function calling:
+
+```python
+from google.genai import types
+
+def get_weather(location: str) -> str:
+    """Get weather for a location."""
+    return f"Sunny in {location}"
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='What is the weather in Boston?',
+    config=types.GenerateContentConfig(tools=[get_weather])
+)
+
+print(response.text)
+```
+
+## Model Configuration
+
+### Generation Parameters
+
+Control model behavior with generation parameters:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Write a creative story',
+    config=types.GenerateContentConfig(
+        temperature=0.9,        # Higher = more creative (0.0-2.0)
+        top_p=0.95,             # Nucleus sampling (0.0-1.0)
+        top_k=40,               # Top-k sampling
+        max_output_tokens=2048, # Maximum output length
+        stop_sequences=['END']  # Stop generation at these sequences
+    )
+)
+```
+
+<ParamField path="temperature" type="float" default="1.0">
+  Controls randomness. Higher values (e.g., 1.5) make output more creative and varied.
+  Lower values (e.g., 0.2) make output more deterministic and focused. Range: 0.0-2.0.
+</ParamField>
+
+<ParamField path="top_p" type="float" default="0.95">
+  Nucleus sampling threshold. Considers tokens with cumulative probability up to top_p.
+  Range: 0.0-1.0. Lower values make output more focused.
+</ParamField>
+
+<ParamField path="top_k" type="int" default="40">
+  Limits sampling to top K tokens by probability. Lower values make output more
+  deterministic.
+</ParamField>
+
+<ParamField path="max_output_tokens" type="int">
+  Maximum number of tokens to generate. Models have different maximum limits.
+</ParamField>
+
+## Model-Specific Documentation
+
+For detailed capabilities and parameters of each model:
+
+- **Vertex AI models:** [Vertex AI Model Documentation](https://cloud.google.com/vertex-ai/generative-ai/docs/models)
+- **Gemini API models:** [Gemini API Model Documentation](https://ai.google.dev/gemini-api/docs/models)
+
+## Best Practices
+
+<Note>
+  **Start with `gemini-2.5-flash`** for most use cases. It provides excellent
+  performance at a lower cost than pro models.
+</Note>
+
+<Note>
+  **Use pro models** when you need:
+  - Complex reasoning and analysis
+  - Deep understanding of nuanced topics
+  - Highest quality outputs for critical applications
+</Note>
+
+<Warning>
+  **Model availability** varies between Gemini Developer API and Vertex AI.
+  Some models (like tuned models and certain Imagen/Veo variants) are only
+  available on Vertex AI.
+</Warning>
+
+<Note>
+  **For embeddings**, always use the latest embedding model (`text-embedding-004`)
+  for best results unless you need backward compatibility.
+</Note>

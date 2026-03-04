@@ -1,0 +1,321 @@
+---
+title: 'interactions.get'
+description: 'Retrieve an interaction (Beta)'
+---
+
+<Note>
+  The Interactions API is currently in Beta. Features and API signatures may change.
+</Note>
+
+## Method
+
+```python
+client.interactions.get(
+    id: str,
+    stream: bool = False,
+    include_input: bool = False,
+    last_event_id: Optional[str] = None
+) -> Interaction | Stream[InteractionSSEEvent]
+```
+
+Retrieves the full details of a single interaction based on its ID. Can optionally stream the response or resume from a specific event.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the interaction to retrieve
+</ParamField>
+
+<ParamField path="stream" type="boolean" default="false">
+  If true, the generated content will be streamed incrementally. Returns `Stream[InteractionSSEEvent]` instead of `Interaction`.
+</ParamField>
+
+<ParamField path="include_input" type="boolean" default="false">
+  If true, includes the original input in the response
+</ParamField>
+
+<ParamField path="last_event_id" type="string">
+  Optional. If set, resumes the interaction stream from the next chunk after the event marked by this ID. Can only be used if `stream` is true.
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the interaction
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The model used for the interaction
+</ResponseField>
+
+<ResponseField name="input" type="Input">
+  The input provided (only if `include_input=True`)
+</ResponseField>
+
+<ResponseField name="output" type="Output">
+  The generated output from the model
+  
+  <Expandable title="Output Fields">
+    <ResponseField name="text" type="string">
+      Text content of the response
+    </ResponseField>
+    
+    <ResponseField name="parts" type="list">
+      List of content parts
+    </ResponseField>
+    
+    <ResponseField name="candidates" type="list">
+      Alternative response candidates
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="state" type="string">
+  State of the interaction:
+  - `PENDING`: Waiting to start
+  - `RUNNING`: Currently processing
+  - `COMPLETED`: Finished successfully
+  - `FAILED`: Encountered an error
+  - `CANCELLED`: Cancelled by user
+</ResponseField>
+
+<ResponseField name="create_time" type="string">
+  ISO 8601 timestamp when the interaction was created
+</ResponseField>
+
+<ResponseField name="update_time" type="string">
+  ISO 8601 timestamp of the last update
+</ResponseField>
+
+<ResponseField name="usage_metadata" type="object">
+  Token usage statistics
+  
+  <Expandable title="Usage Metadata">
+    <ResponseField name="prompt_token_count" type="int">
+      Number of tokens in the input
+    </ResponseField>
+    
+    <ResponseField name="candidates_token_count" type="int">
+      Number of tokens in the output
+    </ResponseField>
+    
+    <ResponseField name="total_token_count" type="int">
+      Total tokens used
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="previous_interaction_id" type="string">
+  ID of the previous interaction in the chain (if any)
+</ResponseField>
+
+## Usage
+
+### Retrieve an Interaction
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Get interaction details
+interaction = client.interactions.get(id='interaction_123')
+
+print(f"ID: {interaction.id}")
+print(f"State: {interaction.state}")
+print(f"Model: {interaction.model}")
+print(f"Output: {interaction.output.text}")
+```
+
+### Include Original Input
+
+```python
+# Get interaction with input included
+interaction = client.interactions.get(
+    id='interaction_123',
+    include_input=True
+)
+
+print(f"Original input: {interaction.input}")
+print(f"Response: {interaction.output.text}")
+```
+
+### Stream Retrieved Interaction
+
+```python
+# Stream a stored interaction
+stream = client.interactions.get(
+    id='interaction_123',
+    stream=True
+)
+
+for event in stream:
+    if event.output:
+        print(event.output.text, end='', flush=True)
+
+print()  # New line after streaming
+```
+
+### Resume Streaming from Event
+
+```python
+# Resume streaming from a specific event
+last_event_id = 'event_456'
+
+stream = client.interactions.get(
+    id='interaction_123',
+    stream=True,
+    last_event_id=last_event_id
+)
+
+for event in stream:
+    print(f"Event ID: {event.id}")
+    if event.output:
+        print(event.output.text)
+```
+
+### Monitor Background Interaction
+
+```python
+import time
+
+interaction_id = 'interaction_123'
+
+# Poll until complete
+while True:
+    interaction = client.interactions.get(id=interaction_id)
+    
+    print(f"State: {interaction.state}")
+    
+    if interaction.state in ['COMPLETED', 'FAILED', 'CANCELLED']:
+        break
+    
+    time.sleep(5)
+
+if interaction.state == 'COMPLETED':
+    print(f"Result: {interaction.output.text}")
+    print(f"Tokens used: {interaction.usage_metadata.total_token_count}")
+else:
+    print(f"Interaction ended with state: {interaction.state}")
+```
+
+### Check Usage Statistics
+
+```python
+interaction = client.interactions.get(id='interaction_123')
+
+if interaction.usage_metadata:
+    usage = interaction.usage_metadata
+    print(f"Prompt tokens: {usage.prompt_token_count}")
+    print(f"Response tokens: {usage.candidates_token_count}")
+    print(f"Total tokens: {usage.total_token_count}")
+```
+
+### Handle Different States
+
+```python
+interaction = client.interactions.get(id='interaction_123')
+
+if interaction.state == 'COMPLETED':
+    print(f"Output: {interaction.output.text}")
+    
+elif interaction.state == 'RUNNING':
+    print("Interaction is still processing...")
+    print(f"Started at: {interaction.create_time}")
+    
+elif interaction.state == 'FAILED':
+    print("Interaction failed")
+    # Check for error details in output or metadata
+    
+elif interaction.state == 'PENDING':
+    print("Interaction is queued")
+```
+
+### Retrieve Interaction Chain
+
+```python
+# Follow a chain of interactions
+interaction_id = 'interaction_123'
+chain = []
+
+while interaction_id:
+    interaction = client.interactions.get(
+        id=interaction_id,
+        include_input=True
+    )
+    
+    chain.append({
+        'id': interaction.id,
+        'input': interaction.input,
+        'output': interaction.output.text
+    })
+    
+    interaction_id = interaction.previous_interaction_id
+
+# Print conversation chain
+print("Conversation chain:")
+for i, item in enumerate(reversed(chain), 1):
+    print(f"\nTurn {i}:")
+    print(f"Input: {item['input']}")
+    print(f"Output: {item['output']}")
+```
+
+### Error Handling
+
+```python
+try:
+    interaction = client.interactions.get(id='interaction_123')
+    
+    if interaction.state == 'COMPLETED':
+        print(interaction.output.text)
+    else:
+        print(f"Interaction not ready: {interaction.state}")
+        
+except ValueError as e:
+    print(f"Invalid interaction ID: {e}")
+except PermissionError as e:
+    print(f"Access denied: {e}")
+except Exception as e:
+    print(f"Error retrieving interaction: {e}")
+```
+
+### Compare Interaction Timing
+
+```python
+from datetime import datetime
+
+interaction = client.interactions.get(id='interaction_123')
+
+create_time = datetime.fromisoformat(
+    interaction.create_time.replace('Z', '+00:00')
+)
+update_time = datetime.fromisoformat(
+    interaction.update_time.replace('Z', '+00:00')
+)
+
+duration = update_time - create_time
+
+print(f"Interaction Duration: {duration}")
+print(f"Created: {create_time}")
+print(f"Updated: {update_time}")
+```
+
+## Notes
+
+<Info>
+  - Only stored interactions can be retrieved (created with `store=True`)
+  - Streaming a retrieved interaction replays or continues the response
+  - Use `last_event_id` to resume interrupted streams
+  - Background interactions can be polled until completion
+  - Token usage is available after interaction completes
+</Info>
+
+## Streaming Behavior
+
+When `stream=True`:
+- If the interaction is complete, the full response is streamed
+- If the interaction is in progress, streaming continues from the current position
+- Use `last_event_id` to resume from a specific point
+- Each event has a unique ID for resumption
+
+## See Also
+
+- [interactions.create](/api/interactions/create) - Create a new interaction

@@ -1,0 +1,441 @@
+---
+title: JSON Response Schema
+description: Learn how to generate structured JSON outputs using JSON schemas and Pydantic models with the Google Gen AI Python SDK.
+---
+
+Gemini models can generate structured JSON output that conforms to a specific schema. This is useful for extracting structured data, creating APIs, or ensuring consistent output formats.
+
+<Warning>
+Don't duplicate your schema in your input prompt or provide examples of expected JSON output. This can lower the quality of generated output.
+</Warning>
+
+## JSON Schema Support
+
+You can provide schemas as standard JSON schema objects:
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+user_profile = {
+    'properties': {
+        'age': {
+            'anyOf': [
+                {'maximum': 20, 'minimum': 0, 'type': 'integer'},
+                {'type': 'null'},
+            ],
+            'title': 'Age',
+        },
+        'username': {
+            'description': "User's unique name",
+            'title': 'Username',
+            'type': 'string',
+        },
+    },
+    'required': ['username', 'age'],
+    'title': 'User Schema',
+    'type': 'object',
+}
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Give me a random user profile.',
+    config={
+        'response_mime_type': 'application/json',
+        'response_json_schema': user_profile
+    },
+)
+print(response.text)
+```
+
+**Output:**
+```json
+{
+    "username": "john_doe_42",
+    "age": 18
+}
+```
+
+## Pydantic Model Schemas
+
+Pydantic models provide a more Pythonic way to define schemas:
+
+```python
+from pydantic import BaseModel
+from google.genai import types
+
+class CountryInfo(BaseModel):
+    name: str
+    population: int
+    capital: str
+    continent: str
+    gdp: int
+    official_language: str
+    total_area_sq_mi: int
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Give me information for the United States.',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=CountryInfo.model_json_schema(),
+    ),
+)
+print(response.text)
+```
+
+**Output:**
+```json
+{
+    "name": "United States",
+    "population": 331900000,
+    "capital": "Washington, D.C.",
+    "continent": "North America",
+    "gdp": 25462700000000,
+    "official_language": "English",
+    "total_area_sq_mi": 3796742
+}
+```
+
+## Alternative Schema Format
+
+You can also define schemas using a simplified format:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Give me information for the United States.',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema={
+            'required': [
+                'name',
+                'population',
+                'capital',
+                'continent',
+                'gdp',
+                'official_language',
+                'total_area_sq_mi',
+            ],
+            'properties': {
+                'name': {'type': 'STRING'},
+                'population': {'type': 'INTEGER'},
+                'capital': {'type': 'STRING'},
+                'continent': {'type': 'STRING'},
+                'gdp': {'type': 'INTEGER'},
+                'official_language': {'type': 'STRING'},
+                'total_area_sq_mi': {'type': 'INTEGER'},
+            },
+            'type': 'OBJECT',
+        },
+    ),
+)
+print(response.text)
+```
+
+## Parsing JSON Responses
+
+Convert JSON string responses to Python objects:
+
+<Tabs>
+  <Tab title="JSON Module">
+    ```python
+    import json
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents='Give me 3 book recommendations',
+        config=types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_json_schema={
+                'type': 'object',
+                'properties': {
+                    'books': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'title': {'type': 'string'},
+                                'author': {'type': 'string'},
+                                'year': {'type': 'integer'}
+                            }
+                        }
+                    }
+                }
+            },
+        ),
+    )
+
+    # Parse JSON
+    data = json.loads(response.text)
+    for book in data['books']:
+        print(f"{book['title']} by {book['author']} ({book['year']})")
+    ```
+  </Tab>
+
+  <Tab title="Pydantic Model">
+    ```python
+    from pydantic import BaseModel
+    from typing import List
+    import json
+
+    class Book(BaseModel):
+        title: str
+        author: str
+        year: int
+
+    class BookList(BaseModel):
+        books: List[Book]
+
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents='Give me 3 book recommendations',
+        config=types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_json_schema=BookList.model_json_schema(),
+        ),
+    )
+
+    # Parse with Pydantic
+    book_list = BookList.model_validate_json(response.text)
+    for book in book_list.books:
+        print(f"{book.title} by {book.author} ({book.year})")
+    ```
+  </Tab>
+</Tabs>
+
+## Complex Schema Examples
+
+### Nested Objects
+
+```python
+from pydantic import BaseModel
+from typing import List, Optional
+from google.genai import types
+
+class Address(BaseModel):
+    street: str
+    city: str
+    state: str
+    zip_code: str
+
+class Person(BaseModel):
+    name: str
+    age: int
+    email: str
+    address: Address
+    phone: Optional[str] = None
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Generate a random person profile with address',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=Person.model_json_schema(),
+    ),
+)
+print(response.text)
+```
+
+### Arrays and Enums
+
+```python
+from pydantic import BaseModel
+from typing import List
+from enum import Enum
+from google.genai import types
+
+class Priority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+class Task(BaseModel):
+    title: str
+    description: str
+    priority: Priority
+    tags: List[str]
+
+class TaskList(BaseModel):
+    tasks: List[Task]
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Generate 3 project tasks for building a website',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=TaskList.model_json_schema(),
+    ),
+)
+print(response.text)
+```
+
+## Data Extraction Use Cases
+
+### Extract Information from Text
+
+```python
+from pydantic import BaseModel
+from typing import List
+from google.genai import types
+
+class ProductReview(BaseModel):
+    product_name: str
+    rating: int  # 1-5
+    pros: List[str]
+    cons: List[str]
+    sentiment: str  # positive, negative, neutral
+
+review_text = """
+I bought the XYZ Laptop last month. The screen is amazing and battery 
+lasts all day. However, it's quite heavy and the keyboard feels cheap.
+Overall, I'd give it 4 out of 5 stars.
+"""
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=f'Extract structured information from this review: {review_text}',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=ProductReview.model_json_schema(),
+    ),
+)
+print(response.text)
+```
+
+### Resume Parser
+
+```python
+from pydantic import BaseModel
+from typing import List
+from google.genai import types
+
+class Education(BaseModel):
+    degree: str
+    institution: str
+    year: int
+
+class Experience(BaseModel):
+    title: str
+    company: str
+    duration: str
+    responsibilities: List[str]
+
+class Resume(BaseModel):
+    name: str
+    email: str
+    phone: str
+    skills: List[str]
+    education: List[Education]
+    experience: List[Experience]
+
+resume_text = """John Doe
+john@example.com | (555) 123-4567
+
+SKILLS: Python, JavaScript, React, Node.js, SQL
+
+EDUCATION:
+BS Computer Science, MIT, 2020
+
+EXPERIENCE:
+Software Engineer at Tech Corp (2020-2023)
+- Developed web applications
+- Managed databases
+"""
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=f'Parse this resume into structured data: {resume_text}',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=Resume.model_json_schema(),
+    ),
+)
+print(response.text)
+```
+
+## JSON with Streaming
+
+You can stream JSON responses, though the response won't be valid JSON until complete:
+
+```python
+from google.genai import types
+import json
+
+full_response = ""
+
+for chunk in client.models.generate_content_stream(
+    model='gemini-2.5-flash',
+    contents='Give me 5 programming languages with descriptions',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema={
+            'type': 'object',
+            'properties': {
+                'languages': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'name': {'type': 'string'},
+                            'description': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+    ),
+):
+    full_response += chunk.text
+    print(chunk.text, end='', flush=True)
+
+# Parse complete JSON
+data = json.loads(full_response)
+print("\n\nParsed:", data)
+```
+
+## Schema Type Reference
+
+| JSON Type | Python Type | Example |
+|-----------|-------------|----------|
+| `string` | `str` | `"hello"` |
+| `integer` | `int` | `42` |
+| `number` | `float` | `3.14` |
+| `boolean` | `bool` | `true` |
+| `array` | `list` | `[1, 2, 3]` |
+| `object` | `dict` | `{"key": "value"}` |
+| `null` | `None` | `null` |
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="API Backends" icon="server">
+    Generate structured responses for REST APIs
+  </Card>
+  <Card title="Data Extraction" icon="database">
+    Extract structured data from unstructured text
+  </Card>
+  <Card title="Form Generation" icon="list-check">
+    Generate form data in consistent formats
+  </Card>
+  <Card title="Report Generation" icon="file-chart-column">
+    Create structured reports and summaries
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+- Always set `response_mime_type='application/json'` when using schemas
+- Use Pydantic models for type safety and validation
+- Don't include schema examples in your prompt
+- Keep schemas simple and focused on essential fields
+- Use `Optional` fields for data that might not always be present
+- Validate parsed JSON against your schema
+- Use enums to constrain string values to specific options
+- Test your schemas with various inputs
+- Handle parsing errors gracefully
+- For streaming, only parse JSON after receiving the complete response

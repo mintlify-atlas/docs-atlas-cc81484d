@@ -1,0 +1,302 @@
+---
+title: 'batches.get'
+description: 'Retrieve information about a batch prediction job'
+---
+
+## Method
+
+```python
+client.batches.get(
+    name: str,
+    config: Optional[GetBatchJobConfig] = None
+) -> BatchJob
+```
+
+Retrieves detailed information about a specific batch job, including its current state, progress, and results.
+
+<ParamField path="name" type="string" required>
+  The resource name or ID of the batch job:
+  - Vertex AI: `projects/{project}/locations/{location}/batchPredictionJobs/{job_id}` or just the `{job_id}` if project/location are set
+  - Gemini API: `batches/{batch_id}` or just the `{batch_id}`
+</ParamField>
+
+<ParamField path="config" type="GetBatchJobConfig">
+  Optional configuration for the request
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="http_options" type="HttpOptions">
+      Custom HTTP options for the request
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="name" type="string">
+  The resource name of the batch job
+</ResponseField>
+
+<ResponseField name="display_name" type="string">
+  Display name of the batch job
+</ResponseField>
+
+<ResponseField name="state" type="JobState">
+  Current state of the batch job:
+  - `JOB_STATE_QUEUED`: Waiting to start
+  - `JOB_STATE_PENDING`: Preparing to run
+  - `JOB_STATE_RUNNING`: Currently processing
+  - `JOB_STATE_SUCCEEDED`: Completed successfully
+  - `JOB_STATE_FAILED`: Failed with errors
+  - `JOB_STATE_CANCELLED`: Cancelled by user
+</ResponseField>
+
+<ResponseField name="create_time" type="string">
+  ISO 8601 timestamp when the job was created
+</ResponseField>
+
+<ResponseField name="start_time" type="string">
+  ISO 8601 timestamp when the job started processing
+</ResponseField>
+
+<ResponseField name="end_time" type="string">
+  ISO 8601 timestamp when the job completed
+</ResponseField>
+
+<ResponseField name="update_time" type="string">
+  ISO 8601 timestamp of the last update
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The model being used for predictions
+</ResponseField>
+
+<ResponseField name="src" type="BatchJobSource">
+  Source configuration (Vertex AI only)
+</ResponseField>
+
+<ResponseField name="dest" type="BatchJobDestination">
+  Destination configuration with output location
+  
+  <Expandable title="Destination Fields">
+    <ResponseField name="gcs_uri" type="string">
+      GCS path to output files (Vertex AI)
+    </ResponseField>
+    
+    <ResponseField name="bigquery_uri" type="string">
+      BigQuery table for output (Vertex AI)
+    </ResponseField>
+    
+    <ResponseField name="file_name" type="string">
+      Output file name (Gemini API)
+    </ResponseField>
+    
+    <ResponseField name="inlined_responses" type="list">
+      Inline responses (Gemini API)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="completion_stats" type="object">
+  Statistics about completed requests (Vertex AI only)
+  
+  <Expandable title="Stats Fields">
+    <ResponseField name="successful_count" type="int">
+      Number of successfully processed requests
+    </ResponseField>
+    
+    <ResponseField name="failed_count" type="int">
+      Number of failed requests
+    </ResponseField>
+    
+    <ResponseField name="incomplete_count" type="int">
+      Number of incomplete requests
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error information if the job failed
+</ResponseField>
+
+## Usage
+
+### Check Job Status
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Get batch job details
+batch_job = client.batches.get(name='123456789')
+
+print(f"Job: {batch_job.name}")
+print(f"State: {batch_job.state}")
+print(f"Created: {batch_job.create_time}")
+
+if batch_job.state == 'JOB_STATE_SUCCEEDED':
+    print(f"Output: {batch_job.dest.file_name}")
+```
+
+### Monitor Progress with Polling
+
+```python
+import time
+from google.genai import types
+
+job_name = '123456789'
+
+while True:
+    batch_job = client.batches.get(name=job_name)
+    
+    print(f"State: {batch_job.state}")
+    
+    # Check for completion
+    if batch_job.state in [
+        types.JobState.JOB_STATE_SUCCEEDED,
+        types.JobState.JOB_STATE_FAILED,
+        types.JobState.JOB_STATE_CANCELLED
+    ]:
+        break
+    
+    # Show progress if available
+    if batch_job.completion_stats:
+        stats = batch_job.completion_stats
+        total = stats.successful_count + stats.failed_count
+        print(f"Progress: {total} requests completed")
+    
+    time.sleep(30)
+
+if batch_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    print(f"Success! Results at: {batch_job.dest.gcs_uri}")
+    print(f"Stats: {batch_job.completion_stats}")
+else:
+    print(f"Job ended with state: {batch_job.state}")
+    if batch_job.error:
+        print(f"Error: {batch_job.error}")
+```
+
+### Retrieve Inline Results (Gemini API)
+
+```python
+from google.genai import types
+
+batch_job = client.batches.get(name='batch123')
+
+if batch_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    # Access inline responses
+    if batch_job.dest.inlined_responses:
+        for idx, response in enumerate(batch_job.dest.inlined_responses):
+            print(f"Response {idx + 1}:")
+            if response.response:
+                print(response.response.text)
+            elif response.error:
+                print(f"Error: {response.error}")
+            print("---")
+```
+
+### Download Results from GCS (Vertex AI)
+
+```python
+from google.cloud import storage
+from google.genai import types
+
+batch_job = client.batches.get(name='123456789')
+
+if batch_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    # Parse GCS URI
+    gcs_uri = batch_job.dest.gcs_uri
+    bucket_name = gcs_uri.split('/')[2]
+    blob_path = '/'.join(gcs_uri.split('/')[3:])
+    
+    # Download results
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    
+    # List all output files
+    blobs = bucket.list_blobs(prefix=blob_path)
+    for blob in blobs:
+        print(f"Downloading: {blob.name}")
+        content = blob.download_as_text()
+        
+        # Process JSONL results
+        for line in content.strip().split('\n'):
+            result = json.loads(line)
+            print(result)
+```
+
+### Check Job with Detailed Stats
+
+```python
+from datetime import datetime
+
+batch_job = client.batches.get(name='123456789')
+
+print(f"Batch Job Details:")
+print(f"  Name: {batch_job.name}")
+print(f"  Display Name: {batch_job.display_name}")
+print(f"  Model: {batch_job.model}")
+print(f"  State: {batch_job.state}")
+print(f"\nTimestamps:")
+print(f"  Created: {batch_job.create_time}")
+if batch_job.start_time:
+    print(f"  Started: {batch_job.start_time}")
+if batch_job.end_time:
+    print(f"  Completed: {batch_job.end_time}")
+    
+    # Calculate duration
+    start = datetime.fromisoformat(batch_job.start_time.replace('Z', '+00:00'))
+    end = datetime.fromisoformat(batch_job.end_time.replace('Z', '+00:00'))
+    duration = end - start
+    print(f"  Duration: {duration}")
+
+if batch_job.completion_stats:
+    print(f"\nCompletion Stats:")
+    stats = batch_job.completion_stats
+    print(f"  Successful: {stats.successful_count}")
+    print(f"  Failed: {stats.failed_count}")
+    print(f"  Incomplete: {stats.incomplete_count}")
+```
+
+### Handle Different Job States
+
+```python
+from google.genai import types
+
+batch_job = client.batches.get(name='123456789')
+
+if batch_job.state == types.JobState.JOB_STATE_RUNNING:
+    elapsed = (datetime.now() - 
+               datetime.fromisoformat(batch_job.start_time.replace('Z', '+00:00')))
+    print(f"Job is running. Elapsed time: {elapsed}")
+    
+elif batch_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    print("Job completed successfully!")
+    print(f"Download results from: {batch_job.dest.gcs_uri}")
+    
+elif batch_job.state == types.JobState.JOB_STATE_FAILED:
+    print("Job failed!")
+    if batch_job.error:
+        print(f"Error details: {batch_job.error}")
+    
+elif batch_job.state == types.JobState.JOB_STATE_CANCELLED:
+    print("Job was cancelled")
+    
+else:
+    print(f"Job is {batch_job.state}")
+```
+
+## Notes
+
+- Job information is updated as the batch processes
+- Completion stats are only available on Vertex AI
+- Inline responses are only available on Gemini API
+- Output files remain available even after job completion
+- Use polling with reasonable intervals (30-60 seconds) to check progress
+
+## See Also
+
+- [batches.create](/api/batches/create) - Create a new batch job
+- [batches.list](/api/batches/list) - List all batch jobs
+- [batches.cancel](/api/batches/cancel) - Cancel a running job
+- [batches.delete](/api/batches/delete) - Delete a batch job

@@ -1,0 +1,435 @@
+---
+title: 'Types'
+description: 'Learn how to use Pydantic models and dictionaries for type-safe API calls'
+---
+
+## Overview
+
+The Google Gen AI SDK supports both Pydantic models and dictionaries for specifying parameters. This flexibility allows you to choose between type-safe Pydantic models or simple Python dictionaries based on your preferences.
+
+## Importing Types
+
+All types are available in the `types` module:
+
+```python
+from google.genai import types
+```
+
+## Using Pydantic Models vs Dictionaries
+
+The SDK accepts both Pydantic model instances and plain dictionaries for most parameters.
+
+### Using Pydantic Models
+
+Pydantic models provide type safety and validation:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=types.Part.from_text(text='Why is the sky blue?'),
+    config=types.GenerateContentConfig(
+        temperature=0,
+        top_p=0.95,
+        top_k=20,
+    ),
+)
+```
+
+### Using Dictionaries
+
+Dictionaries provide a more concise syntax:
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents={'text': 'Why is the sky blue?'},
+    config={
+        'temperature': 0,
+        'top_p': 0.95,
+        'top_k': 20,
+    },
+)
+```
+
+<Note>
+  Both approaches produce the same result. The SDK automatically converts dictionaries
+  to the appropriate Pydantic models internally.
+</Note>
+
+## Common Types
+
+### Part
+
+Represents a single piece of content (text, image, file, function call, etc.):
+
+```python
+from google.genai import types
+
+# Text part
+text_part = types.Part.from_text(text='Hello, world!')
+
+# Image from URI
+image_part = types.Part.from_uri(
+    file_uri='gs://bucket/image.jpg',
+    mime_type='image/jpeg'
+)
+
+# Image from bytes
+with open('image.jpg', 'rb') as f:
+    image_bytes = f.read()
+image_part = types.Part.from_bytes(
+    data=image_bytes,
+    mime_type='image/jpeg'
+)
+
+# Function call
+function_part = types.Part.from_function_call(
+    name='get_weather',
+    args={'location': 'Boston'}
+)
+
+# Function response
+response_part = types.Part.from_function_response(
+    name='get_weather',
+    response={'result': 'sunny'}
+)
+```
+
+### Content
+
+Represents a message with a role and multiple parts:
+
+```python
+from google.genai import types
+
+# User content
+user_content = types.Content(
+    role='user',
+    parts=[types.Part.from_text(text='What is the weather?')]
+)
+
+# Model content
+model_content = types.Content(
+    role='model',
+    parts=[types.Part.from_text(text='The weather is sunny.')]
+)
+```
+
+### GenerateContentConfig
+
+Configuration for content generation:
+
+```python
+from google.genai import types
+
+config = types.GenerateContentConfig(
+    temperature=0.9,
+    top_p=0.95,
+    top_k=40,
+    max_output_tokens=1024,
+    system_instruction='You are a helpful assistant.',
+    safety_settings=[
+        types.SafetySetting(
+            category='HARM_CATEGORY_HATE_SPEECH',
+            threshold='BLOCK_ONLY_HIGH'
+        )
+    ]
+)
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Tell me a story',
+    config=config
+)
+```
+
+### HttpOptions
+
+Customize HTTP behavior for requests:
+
+```python
+from google.genai import types
+
+http_options = types.HttpOptions(
+    api_version='v1',
+    timeout=60000,  # milliseconds
+    headers={'Custom-Header': 'value'},
+    retry_options=types.HttpRetryOptions(
+        attempts=5,
+        initial_delay=1.0,
+        max_delay=60.0,
+        exp_base=2.0,
+        jitter=1.0
+    )
+)
+
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=http_options
+)
+```
+
+## TypedDict Variants
+
+For each Pydantic model, there's a corresponding `TypedDict` variant with a `Dict` suffix:
+
+- `types.Content` → `types.ContentDict`
+- `types.Part` → `types.PartDict`
+- `types.GenerateContentConfig` → `types.GenerateContentConfigDict`
+- `types.HttpOptions` → `types.HttpOptionsDict`
+
+These TypedDict variants are useful for type hints when using dictionaries:
+
+```python
+from google.genai import types
+
+def create_config() -> types.GenerateContentConfigDict:
+    return {
+        'temperature': 0.9,
+        'top_p': 0.95,
+        'max_output_tokens': 1024
+    }
+```
+
+## Schema Types
+
+### JSONSchema
+
+Define response schemas using JSON Schema format:
+
+```python
+from google.genai import types
+
+user_schema = {
+    'type': 'object',
+    'properties': {
+        'username': {
+            'type': 'string',
+            'description': "User's unique name"
+        },
+        'age': {
+            'type': 'integer',
+            'minimum': 0,
+            'maximum': 120
+        }
+    },
+    'required': ['username', 'age']
+}
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Generate a random user profile',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=user_schema
+    )
+)
+```
+
+### Pydantic Model Schema
+
+Use Pydantic models directly for schema definition:
+
+```python
+from pydantic import BaseModel
+from google.genai import types
+
+class CountryInfo(BaseModel):
+    name: str
+    population: int
+    capital: str
+    continent: str
+    gdp: int
+    official_language: str
+    total_area_sq_mi: int
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Give me information for the United States',
+    config=types.GenerateContentConfig(
+        response_mime_type='application/json',
+        response_json_schema=CountryInfo.model_json_schema()
+    )
+)
+```
+
+## Enum Types
+
+The SDK provides numerous enum types for various settings:
+
+### HarmCategory
+
+```python
+from google.genai import types
+
+safety_settings = [
+    types.SafetySetting(
+        category='HARM_CATEGORY_HARASSMENT',
+        threshold='BLOCK_MEDIUM_AND_ABOVE'
+    ),
+    types.SafetySetting(
+        category='HARM_CATEGORY_HATE_SPEECH',
+        threshold='BLOCK_ONLY_HIGH'
+    )
+]
+```
+
+### FunctionCallingConfigMode
+
+```python
+from google.genai import types
+
+config = types.GenerateContentConfig(
+    tools=[my_function],
+    tool_config=types.ToolConfig(
+        function_calling_config=types.FunctionCallingConfig(
+            mode='ANY'  # or 'AUTO', 'NONE', 'VALIDATED'
+        )
+    )
+)
+```
+
+### FinishReason
+
+The response includes a finish reason enum:
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Hello'
+)
+
+finish_reason = response.candidates[0].finish_reason
+# Possible values: 'STOP', 'MAX_TOKENS', 'SAFETY', 'RECITATION', etc.
+```
+
+## File and Blob Types
+
+### FileData
+
+References files stored in Google Cloud Storage:
+
+```python
+from google.genai import types
+
+file_data = types.FileData(
+    file_uri='gs://bucket/document.pdf',
+    mime_type='application/pdf'
+)
+
+part = types.Part(file_data=file_data)
+```
+
+### Blob
+
+Contains inline binary data:
+
+```python
+from google.genai import types
+
+with open('image.jpg', 'rb') as f:
+    image_bytes = f.read()
+
+blob = types.Blob(
+    data=image_bytes,
+    mime_type='image/jpeg'
+)
+
+part = types.Part(inline_data=blob)
+```
+
+## Function Calling Types
+
+### FunctionDeclaration
+
+Manually declare functions for the model to call:
+
+```python
+from google.genai import types
+
+function_declaration = types.FunctionDeclaration(
+    name='get_weather',
+    description='Get the current weather for a location',
+    parameters_json_schema={
+        'type': 'object',
+        'properties': {
+            'location': {
+                'type': 'string',
+                'description': 'The city and state, e.g. San Francisco, CA'
+            }
+        },
+        'required': ['location']
+    }
+)
+
+tool = types.Tool(function_declarations=[function_declaration])
+```
+
+### FunctionCall and FunctionResponse
+
+```python
+from google.genai import types
+
+# Function call from model
+function_call = types.FunctionCall(
+    name='get_weather',
+    args={'location': 'Boston'}
+)
+
+# Your function response
+function_response = types.FunctionResponse(
+    name='get_weather',
+    response={'result': 'sunny'}
+)
+```
+
+## Cache Types
+
+### CreateCachedContentConfig
+
+```python
+from google.genai import types
+
+cache_config = types.CreateCachedContentConfig(
+    contents=[
+        types.Content(
+            role='user',
+            parts=[types.Part.from_uri(
+                file_uri='gs://bucket/large-document.pdf',
+                mime_type='application/pdf'
+            )]
+        )
+    ],
+    system_instruction='Summarize the document',
+    ttl='3600s',
+    display_name='document-cache'
+)
+
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=cache_config
+)
+```
+
+## Best Practices
+
+<Note>
+  **Use Pydantic models for:**
+  - Large, complex configurations
+  - When you want IDE autocomplete and type checking
+  - When building reusable configuration objects
+</Note>
+
+<Note>
+  **Use dictionaries for:**
+  - Quick prototyping and experimentation
+  - Simple, one-off configurations
+  - When you prefer a more concise syntax
+</Note>
+
+<Warning>
+  When using dictionaries, ensure that key names exactly match the Pydantic field names
+  (usually in snake_case). Typos will not be caught until runtime.
+</Warning>

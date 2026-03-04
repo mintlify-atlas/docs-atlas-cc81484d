@@ -1,0 +1,185 @@
+---
+title: Types Overview
+description: Core type system for the Google Gen AI SDK
+---
+
+## Overview
+
+The `types` module provides the core type system for the Google Gen AI SDK. It includes Pydantic models and TypedDict definitions for all API request and response objects.
+
+## Importing Types
+
+Types can be imported directly from the main package:
+
+```python
+from google import genai
+from google.genai import types
+
+# Import specific types
+from google.genai.types import (
+    Part,
+    Content,
+    GenerateContentConfig,
+    HttpOptions,
+)
+```
+
+## Pydantic Models vs TypedDict
+
+The SDK provides two ways to work with types:
+
+### Pydantic Models
+
+Pydantic models provide validation, type checking, and convenient methods:
+
+```python
+from google.genai.types import Part, Content
+
+# Create using Pydantic model
+part = Part.from_text(text="Hello")
+content = Content(parts=[part], role="user")
+```
+
+**Benefits:**
+- Runtime validation
+- Type safety
+- Helper methods and constructors
+- Serialization/deserialization
+
+### TypedDict
+
+TypedDict definitions provide type hints for dictionaries:
+
+```python
+from google.genai.types import PartDict, ContentDict
+
+# Create using plain dict
+part_dict: PartDict = {"text": "Hello"}
+content_dict: ContentDict = {
+    "parts": [part_dict],
+    "role": "user"
+}
+```
+
+**Benefits:**
+- Lighter weight
+- More flexible
+- Compatible with JSON serialization
+- Editor autocomplete
+
+## Union Types
+
+Many parameters accept union types for flexibility:
+
+```python
+from google.genai.types import PartOrDict, ContentOrDict
+
+# These are equivalent
+PartOrDict = Union[Part, PartDict]
+ContentOrDict = Union[Content, ContentDict]
+```
+
+## Key Type Categories
+
+### Content Types
+
+Types for representing messages and content:
+
+- [Content](/api/types/content) - Multi-part message content
+- [Part](/api/types/part) - Individual content parts
+- UserContent - Content from the user
+- ModelContent - Content from the model
+
+### Configuration Types
+
+Types for configuring API requests:
+
+- [GenerateContentConfig](/api/types/config#generatecontentconfig) - Content generation parameters
+- [HttpOptions](/api/types/config#httpoptions) - HTTP request options
+- [HttpRetryOptions](/api/types/config#httpretryoptions) - Retry configuration
+
+### Enum Types
+
+The module includes many enum types for API options:
+
+```python
+from google.genai.types import (
+    HarmCategory,
+    HarmBlockThreshold,
+    FinishReason,
+    FunctionCallingConfigMode,
+)
+```
+
+All enums are case-insensitive:
+
+```python
+# These are equivalent
+HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
+HarmBlockThreshold.block_medium_and_above
+```
+
+## Type Hierarchy
+
+```
+Content
+├── UserContent (role="user")
+├── ModelContent (role="model")
+└── parts: List[Part]
+    ├── text: str
+    ├── inline_data: Blob
+    ├── file_data: FileData
+    ├── function_call: FunctionCall
+    ├── function_response: FunctionResponse
+    ├── executable_code: ExecutableCode
+    └── code_execution_result: CodeExecutionResult
+```
+
+## Common Patterns
+
+### Creating Content
+
+```python
+from google.genai.types import UserContent, Part
+
+# Simple text
+content = UserContent("Hello, world!")
+
+# Multiple parts
+content = UserContent([
+    "What's in this image?",
+    Part.from_uri(file_uri="gs://bucket/image.jpg", mime_type="image/jpeg")
+])
+
+# Mixed content
+content = UserContent([
+    Part.from_text(text="Analyze this:"),
+    Part.from_bytes(data=image_bytes, mime_type="image/png")
+])
+```
+
+### Using Configuration
+
+```python
+from google.genai.types import GenerateContentConfig
+
+config = GenerateContentConfig(
+    temperature=0.7,
+    max_output_tokens=1024,
+    top_p=0.95,
+    response_mime_type="application/json"
+)
+
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents="Tell me a story",
+    config=config
+)
+```
+
+## See Also
+
+- [Content Types](/api/types/content) - Detailed content type reference
+- [Part Class](/api/types/part) - Part factory methods
+- [Configuration Types](/api/types/config) - Configuration options
+- [Client Reference](/api/client) - Using types with the client

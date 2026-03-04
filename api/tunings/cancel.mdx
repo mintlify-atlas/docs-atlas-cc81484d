@@ -1,0 +1,201 @@
+---
+title: 'tunings.cancel'
+description: 'Cancel a running or pending tuning job'
+---
+
+## Method
+
+```python
+client.tunings.cancel(
+    name: str,
+    config: Optional[CancelTuningJobConfig] = None
+) -> CancelTuningJobResponse
+```
+
+Cancels a tuning job that is currently running or pending. Once cancelled, the job cannot be resumed.
+
+<ParamField path="name" type="string" required>
+  The resource name of the tuning job to cancel. Format:
+  - Vertex AI: `projects/{project}/locations/{location}/tuningJobs/{job_id}`
+  - Gemini API: `tunedModels/{model_id}`
+</ParamField>
+
+<ParamField path="config" type="CancelTuningJobConfig">
+  Optional configuration for the cancel request
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="http_options" type="HttpOptions">
+      Custom HTTP options for the request
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="sdk_http_response" type="HttpResponse">
+  HTTP response information including headers and status
+</ResponseField>
+
+The method returns an empty response object on success. The job state will be updated to `JOB_STATE_CANCELLED`.
+
+## Usage
+
+### Cancel a Tuning Job
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Cancel a running job
+job_name = 'projects/my-project/locations/us-central1/tuningJobs/123456'
+client.tunings.cancel(name=job_name)
+
+print(f"Cancelled job: {job_name}")
+
+# Verify cancellation
+tuning_job = client.tunings.get(name=job_name)
+print(f"Job state: {tuning_job.state}")  # Should be JOB_STATE_CANCELLED
+```
+
+### Cancel with Error Handling
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key='your-api-key')
+
+job_name = 'projects/my-project/locations/us-central1/tuningJobs/123456'
+
+try:
+    # Check if job is cancellable
+    tuning_job = client.tunings.get(name=job_name)
+    
+    if tuning_job.state in [
+        types.JobState.JOB_STATE_RUNNING,
+        types.JobState.JOB_STATE_PENDING,
+        types.JobState.JOB_STATE_QUEUED
+    ]:
+        client.tunings.cancel(name=job_name)
+        print(f"Job {job_name} cancelled successfully")
+    else:
+        print(f"Job cannot be cancelled. Current state: {tuning_job.state}")
+        
+except Exception as e:
+    print(f"Error cancelling job: {e}")
+```
+
+### Cancel All Running Jobs
+
+```python
+from google.genai import types
+
+# Find and cancel all running jobs
+running_states = [
+    types.JobState.JOB_STATE_RUNNING,
+    types.JobState.JOB_STATE_PENDING,
+    types.JobState.JOB_STATE_QUEUED
+]
+
+cancelled_count = 0
+for tuning_job in client.tunings.list():
+    if tuning_job.state in running_states:
+        try:
+            client.tunings.cancel(name=tuning_job.name)
+            print(f"Cancelled: {tuning_job.name}")
+            cancelled_count += 1
+        except Exception as e:
+            print(f"Failed to cancel {tuning_job.name}: {e}")
+
+print(f"\nTotal jobs cancelled: {cancelled_count}")
+```
+
+### Cancel and Wait for Confirmation
+
+```python
+import time
+from google.genai import types
+
+job_name = 'projects/my-project/locations/us-central1/tuningJobs/123456'
+
+# Request cancellation
+client.tunings.cancel(name=job_name)
+print("Cancellation requested...")
+
+# Wait for cancellation to take effect
+max_wait = 60  # seconds
+start_time = time.time()
+
+while time.time() - start_time < max_wait:
+    tuning_job = client.tunings.get(name=job_name)
+    
+    if tuning_job.state == types.JobState.JOB_STATE_CANCELLED:
+        print(f"Job successfully cancelled")
+        break
+    
+    print(f"Waiting for cancellation... Current state: {tuning_job.state}")
+    time.sleep(5)
+else:
+    print("Cancellation taking longer than expected")
+```
+
+### Conditional Cancellation
+
+```python
+from datetime import datetime, timedelta
+from google.genai import types
+
+# Cancel jobs running longer than 2 hours
+max_runtime = timedelta(hours=2)
+
+for tuning_job in client.tunings.list():
+    if tuning_job.state == types.JobState.JOB_STATE_RUNNING:
+        start_time = datetime.fromisoformat(
+            tuning_job.start_time.replace('Z', '+00:00')
+        )
+        runtime = datetime.now(start_time.tzinfo) - start_time
+        
+        if runtime > max_runtime:
+            print(f"Cancelling long-running job: {tuning_job.name}")
+            print(f"Runtime: {runtime}")
+            client.tunings.cancel(name=tuning_job.name)
+```
+
+## Important Notes
+
+<Warning>
+  Cancelling a tuning job is irreversible. The job cannot be resumed after cancellation.
+</Warning>
+
+- Only jobs in `RUNNING`, `PENDING`, or `QUEUED` states can be cancelled
+- Jobs that are `SUCCEEDED`, `FAILED`, or already `CANCELLED` cannot be cancelled
+- Cancellation is asynchronous - the job state may not immediately reflect the cancellation
+- No partial models are saved when a job is cancelled
+- You will not be charged for the remaining compute time after cancellation
+
+## Error Handling
+
+The cancel operation may fail in the following cases:
+
+- **Job not found**: The specified job name doesn't exist
+- **Invalid state**: The job is already completed or cancelled
+- **Permission denied**: Insufficient permissions to cancel the job
+- **Network error**: Connection issues with the API
+
+```python
+try:
+    client.tunings.cancel(name=job_name)
+except ValueError as e:
+    print(f"Invalid job state: {e}")
+except PermissionError as e:
+    print(f"Permission denied: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## See Also
+
+- [tunings.get](/api/tunings/get) - Check job status before cancelling
+- [tunings.list](/api/tunings/list) - Find jobs to cancel
+- [tunings.tune](/api/tunings/tune) - Create a new tuning job

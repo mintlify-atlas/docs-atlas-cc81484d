@@ -1,0 +1,415 @@
+---
+title: AsyncClient
+description: Asynchronous client for making non-blocking requests to the Gemini API or Vertex AI API.
+---
+
+The `AsyncClient` class provides asynchronous (non-blocking) access to all SDK features. It is accessed through the `client.aio` property of a synchronous `Client` instance.
+
+## Accessing AsyncClient
+
+You don't directly instantiate `AsyncClient`. Instead, access it through the `aio` property:
+
+```python
+from google import genai
+
+client = genai.Client(api_key='my-api-key')
+async_client = client.aio
+```
+
+## Usage Examples
+
+### Basic Async Request
+
+```python
+from google import genai
+
+client = genai.Client(api_key='my-api-key')
+
+async def generate():
+    response = await client.aio.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Tell me a story'
+    )
+    print(response.text)
+
+import asyncio
+asyncio.run(generate())
+```
+
+### Using Async Context Manager
+
+The async client supports async context managers for automatic resource cleanup:
+
+```python
+from google import genai
+
+async def main():
+    client = genai.Client(api_key='my-api-key')
+    
+    async with client.aio as async_client:
+        response = await async_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents='Hello World'
+        )
+        print(response.text)
+    # Async client is automatically closed when exiting the context
+
+import asyncio
+asyncio.run(main())
+```
+
+### Concurrent Requests
+
+Use `asyncio.gather()` to make multiple requests concurrently:
+
+```python
+from google import genai
+import asyncio
+
+async def generate_multiple():
+    client = genai.Client(api_key='my-api-key')
+    
+    # Make 3 concurrent requests
+    results = await asyncio.gather(
+        client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents='Tell me about Python'
+        ),
+        client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents='Tell me about JavaScript'
+        ),
+        client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents='Tell me about Go'
+        )
+    )
+    
+    for i, response in enumerate(results, 1):
+        print(f"Response {i}: {response.text[:100]}...")
+
+asyncio.run(generate_multiple())
+```
+
+### Vertex AI with Async
+
+```python
+from google import genai
+
+async def vertex_example():
+    client = genai.Client(
+        vertexai=True,
+        project='my-project-id',
+        location='us-central1'
+    )
+    
+    response = await client.aio.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Hello Vertex AI'
+    )
+    print(response.text)
+
+import asyncio
+asyncio.run(vertex_example())
+```
+
+## Properties
+
+All properties return async versions of the corresponding synchronous APIs.
+
+### models
+
+<ResponseField name="models" type="AsyncModels">
+  Async access to the Models API for content generation, embeddings, and model management.
+  
+  See [generate_content](/api/models/generate-content) for available methods.
+</ResponseField>
+
+```python
+response = await client.aio.models.generate_content(
+    model='gemini-2.0-flash',
+    contents='Tell me a story'
+)
+```
+
+### chats
+
+<ResponseField name="chats" type="AsyncChats">
+  Async access to multi-turn conversation functionality.
+  
+  See [chats.create](/api/chats/create) for details.
+</ResponseField>
+
+```python
+chat = await client.aio.chats.create(model='gemini-2.0-flash')
+response = await chat.send_message('Hello!')
+```
+
+### files
+
+<ResponseField name="files" type="AsyncFiles">
+  Async access to the Files API for uploading and managing media files.
+  
+  See [files.upload](/api/files/upload) for details.
+</ResponseField>
+
+```python
+file = await client.aio.files.upload(path='image.jpg')
+print(file.name)
+```
+
+### caches
+
+<ResponseField name="caches" type="AsyncCaches">
+  Async access to the Caches API for context caching.
+  
+  See [caches.create](/api/caches/create) for details.
+</ResponseField>
+
+```python
+cache = await client.aio.caches.create(
+    model='gemini-2.0-flash',
+    contents='Long document...'
+)
+```
+
+### file_search_stores
+
+<ResponseField name="file_search_stores" type="AsyncFileSearchStores">
+  Async access to the File Search Stores API for semantic search.
+</ResponseField>
+
+### batches
+
+<ResponseField name="batches" type="AsyncBatches">
+  Async access to the Batches API for batch processing.
+  
+  See [batches.create](/api/batches/create) for details.
+</ResponseField>
+
+### tunings
+
+<ResponseField name="tunings" type="AsyncTunings">
+  Async access to the Tunings API for model fine-tuning.
+  
+  See [tunings.tune](/api/tunings/tune) for details.
+</ResponseField>
+
+### live
+
+<ResponseField name="live" type="AsyncLive">
+  Async access to the Live API for real-time streaming interactions.
+</ResponseField>
+
+### auth_tokens
+
+<ResponseField name="auth_tokens" type="AsyncTokens">
+  Async access to authentication token management.
+</ResponseField>
+
+### operations
+
+<ResponseField name="operations" type="AsyncOperations">
+  Async access to long-running operations management.
+</ResponseField>
+
+### interactions
+
+<ResponseField name="interactions" type="AsyncInteractionsResource">
+  Async access to the experimental Interactions API for live, streaming interactions.
+  
+  <Warning>
+    This API is experimental and may change in future versions.
+  </Warning>
+</ResponseField>
+
+## Methods
+
+### aclose()
+
+Closes the async client explicitly and releases resources.
+
+<Note>
+  This method only closes the async client. It does not close the sync client, which can be closed using `client.close()` or the sync context manager.
+</Note>
+
+```python
+from google.genai import Client
+
+async def example():
+    client = Client(
+        vertexai=True,
+        project='my-project-id',
+        location='us-central1'
+    )
+    
+    async_client = client.aio
+    
+    response_1 = await async_client.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Hello World'
+    )
+    
+    response_2 = await async_client.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Goodbye World'
+    )
+    
+    # Close the async client to release resources
+    await async_client.aclose()
+
+import asyncio
+asyncio.run(example())
+```
+
+### Context Manager Methods
+
+The AsyncClient supports the async context manager protocol for automatic resource cleanup.
+
+#### \_\_aenter\_\_()
+
+Enters the async runtime context and returns the async client.
+
+#### \_\_aexit\_\_(exc_type, exc_value, traceback)
+
+Exits the async runtime context and closes the async client.
+
+```python
+async def example():
+    client = genai.Client(api_key='my-api-key')
+    
+    async with client.aio as async_client:
+        # Use the async client
+        response = await async_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents='Hello'
+        )
+        print(response.text)
+    # Async client is automatically closed here
+
+import asyncio
+asyncio.run(example())
+```
+
+## Advanced Patterns
+
+### Error Handling with Async
+
+```python
+from google import genai
+import asyncio
+
+async def safe_generate():
+    client = genai.Client(api_key='my-api-key')
+    
+    try:
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents='Tell me a story'
+        )
+        print(response.text)
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        await client.aio.aclose()
+
+asyncio.run(safe_generate())
+```
+
+### Async Iteration with Streaming
+
+```python
+from google import genai
+
+async def stream_example():
+    client = genai.Client(api_key='my-api-key')
+    
+    async for chunk in await client.aio.models.generate_content_stream(
+        model='gemini-2.0-flash',
+        contents='Write a long story'
+    ):
+        if chunk.text:
+            print(chunk.text, end='', flush=True)
+    print()  # New line at the end
+
+import asyncio
+asyncio.run(stream_example())
+```
+
+### Combining Sync and Async
+
+You can use both sync and async clients from the same `Client` instance:
+
+```python
+from google import genai
+import asyncio
+
+def sync_operation(client):
+    # Synchronous operation
+    return client.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Sync request'
+    )
+
+async def async_operation(client):
+    # Asynchronous operation
+    return await client.aio.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Async request'
+    )
+
+async def main():
+    client = genai.Client(api_key='my-api-key')
+    
+    # Use sync client
+    sync_response = sync_operation(client)
+    print(f"Sync: {sync_response.text[:50]}...")
+    
+    # Use async client
+    async_response = await async_operation(client)
+    print(f"Async: {async_response.text[:50]}...")
+    
+    # Clean up
+    await client.aio.aclose()
+    client.close()
+
+asyncio.run(main())
+```
+
+## Performance Considerations
+
+### When to Use AsyncClient
+
+Use the async client when:
+- Making multiple concurrent API requests
+- Building web applications with async frameworks (FastAPI, aiohttp, etc.)
+- Processing large batches of requests efficiently
+- Integrating with other async libraries
+
+### Connection Pooling
+
+The async client automatically manages connection pooling for efficient resource usage. You can customize this behavior using `http_options`:
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    api_key='my-api-key',
+    http_options=types.HttpOptions(
+        async_client_args={
+            'limits': {
+                'max_connections': 100,
+                'max_keepalive_connections': 20
+            }
+        }
+    )
+)
+```
+
+## See Also
+
+- [Client](/api/client) - Synchronous client documentation
+- [generate_content](/api/models/generate-content) - Generate content with models
+- [chats.create](/api/chats/create) - Multi-turn conversations
+- [files.upload](/api/files/upload) - Upload and manage media files

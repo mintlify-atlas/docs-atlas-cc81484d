@@ -1,0 +1,288 @@
+---
+title: Generate Content
+description: Learn how to generate text content using the Google Gen AI Python SDK with various input formats and response handling techniques.
+---
+
+The `generate_content` method is the primary way to interact with Gemini models for text generation. This guide covers different ways to structure your inputs and handle responses.
+
+## Basic Text Generation
+
+The simplest way to generate content is to pass a string prompt:
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Why is the sky blue?'
+)
+print(response.text)
+```
+
+## Understanding the Contents Parameter
+
+The SDK converts all inputs to the `contents` parameter into `list[types.Content]`. You can structure your inputs in several ways:
+
+<Tabs>
+  <Tab title="String Input">
+    The simplest format - SDK converts it to a text part:
+
+    ```python
+    contents = 'Why is the sky blue?'
+    ```
+
+    The SDK converts this to:
+
+    ```python
+    [
+        types.UserContent(
+            parts=[
+                types.Part.from_text(text='Why is the sky blue?')
+            ]
+        )
+    ]
+    ```
+
+    Where `types.UserContent` is a subclass of `types.Content` with `role='user'`.
+  </Tab>
+
+  <Tab title="List of Strings">
+    Multiple strings become multiple parts in a single content:
+
+    ```python
+    contents = ['Why is the sky blue?', 'Why is the cloud white?']
+    ```
+
+    The SDK converts this to:
+
+    ```python
+    [
+        types.UserContent(
+            parts=[
+                types.Part.from_text(text='Why is the sky blue?'),
+                types.Part.from_text(text='Why is the cloud white?'),
+            ]
+        )
+    ]
+    ```
+  </Tab>
+
+  <Tab title="Content Object">
+    Explicit control with `types.Content`:
+
+    ```python
+    from google.genai import types
+
+    contents = types.Content(
+        role='user',
+        parts=[types.Part.from_text(text='Why is the sky blue?')]
+    )
+    ```
+
+    The SDK wraps this in a list:
+
+    ```python
+    [
+        types.Content(
+            role='user',
+            parts=[types.Part.from_text(text='Why is the sky blue?')]
+        )
+    ]
+    ```
+  </Tab>
+
+  <Tab title="List of Content">
+    Full control for multi-turn conversations:
+
+    ```python
+    from google.genai import types
+
+    contents = [
+        types.Content(
+            role='user',
+            parts=[types.Part.from_text(text='Hello!')]
+        ),
+        types.Content(
+            role='model',
+            parts=[types.Part.from_text(text='Hi! How can I help?')]
+        ),
+        types.Content(
+            role='user',
+            parts=[types.Part.from_text(text='Why is the sky blue?')]
+        )
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+## Working with Parts
+
+Parts are the building blocks of content. You can mix different types:
+
+### Text Parts
+
+```python
+from google.genai import types
+
+contents = types.Part.from_text('Why is the sky blue?')
+```
+
+The SDK converts non-function-call parts into `types.UserContent`:
+
+```python
+[
+    types.UserContent(parts=[
+        types.Part.from_text('Why is the sky blue?')
+    ])
+]
+```
+
+### List of Parts
+
+```python
+from google.genai import types
+
+contents = [
+    types.Part.from_text('What is this image about?'),
+    types.Part.from_uri(
+        file_uri='gs://generativeai-downloads/images/scones.jpg',
+        mime_type='image/jpeg',
+    )
+]
+```
+
+The SDK groups them into a single `types.UserContent`:
+
+```python
+[
+    types.UserContent(
+        parts=[
+            types.Part.from_text('What is this image about?'),
+            types.Part.from_uri(
+                file_uri='gs://generativeai-downloads/images/scones.jpg',
+                mime_type='image/jpeg',
+            )
+        ]
+    )
+]
+```
+
+## Response Handling
+
+The response object provides several ways to access the generated content:
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Tell me a story'
+)
+
+# Get the text content
+print(response.text)
+
+# Access individual parts
+for part in response.parts:
+    if part.text:
+        print(part.text)
+
+# Access candidates and their content
+for candidate in response.candidates:
+    print(candidate.content.parts[0].text)
+```
+
+## Image Output Generation
+
+Some models like `gemini-2.5-flash-image` can generate images:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash-image',
+    contents='A cartoon infographic for flying sneakers',
+    config=types.GenerateContentConfig(
+        response_modalities=["IMAGE"],
+        image_config=types.ImageConfig(
+            aspect_ratio="9:16",
+        ),
+    ),
+)
+
+for part in response.parts:
+    if part.inline_data:
+        generated_image = part.as_image()
+        generated_image.show()
+```
+
+## Using Uploaded Files
+
+You can reference uploaded files in your prompts (Gemini Developer API only):
+
+```python
+# Upload a file first
+file = client.files.upload(file='a11.txt')
+
+# Use it in generate_content
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=['Could you summarize this file?', file]
+)
+print(response.text)
+```
+
+## Mixed Content Types
+
+You can mix different content types in a single request:
+
+```python
+from google.genai import types
+
+contents = [
+    types.Content(
+        role='user',
+        parts=[types.Part.from_text(text='Previous question')]
+    ),
+    types.Content(
+        role='model',
+        parts=[types.Part.from_text(text='Previous answer')]
+    ),
+    # Inner list becomes a single UserContent
+    [
+        types.Part.from_text('What is this?'),
+        types.Part.from_uri(
+            file_uri='gs://generativeai-downloads/images/scones.jpg',
+            mime_type='image/jpeg',
+        )
+    ]
+]
+```
+
+The SDK groups consecutive non-function-call parts into `types.UserContent` and consecutive function-call parts into `types.ModelContent`.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Q&A Systems" icon="comments">
+    Generate answers to user questions with context
+  </Card>
+  <Card title="Content Creation" icon="pen-to-square">
+    Generate blog posts, articles, or creative writing
+  </Card>
+  <Card title="Summarization" icon="compress">
+    Summarize documents, articles, or conversations
+  </Card>
+  <Card title="Translation" icon="language">
+    Translate text between languages
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+- Use simple string inputs for basic prompts
+- Use `types.Content` objects when you need explicit role control
+- Combine text and other modalities (images, files) in the same request
+- Access `response.text` for simple text responses
+- Iterate over `response.parts` for multimodal responses
+- Check `response.candidates` for multiple response options

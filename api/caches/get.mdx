@@ -1,0 +1,280 @@
+---
+title: caches.get
+description: Retrieve cached content metadata and configuration
+---
+
+Retrieves the metadata and configuration of a previously created cached content resource.
+
+## Method Signature
+
+```python
+client.caches.get(
+    name: str,
+    config: Optional[GetCachedContentConfigOrDict] = None
+) -> CachedContent
+```
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The cached content resource name to retrieve.
+  
+  Format: `"cachedContents/abc123"` or a full resource path
+</ParamField>
+
+<ParamField path="config" type="GetCachedContentConfig">
+  Optional configuration for the request.
+  
+  Available options:
+  - `http_options`: Custom HTTP request options
+</ParamField>
+
+## Returns
+
+<ResponseField name="cached_content" type="CachedContent">
+  A CachedContent object containing:
+  - `name`: The resource name
+  - `model`: The associated model
+  - `display_name`: Human-readable name
+  - `contents`: The cached content
+  - `system_instruction`: Cached system instructions
+  - `tools`: Cached tool configurations
+  - `create_time`: When the cache was created
+  - `update_time`: Last update timestamp
+  - `expire_time`: When the cache will expire
+  - `usage_metadata`: Token count and usage information
+</ResponseField>
+
+## Examples
+
+### Get Cache by Name
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Get cache metadata
+cached = client.caches.get(name='cachedContents/abc123')
+
+print(f"Display name: {cached.display_name}")
+print(f"Model: {cached.model}")
+print(f"Created: {cached.create_time}")
+print(f"Expires: {cached.expire_time}")
+print(f"Cached tokens: {cached.usage_metadata.total_token_count}")
+```
+
+### Check Cache Before Using
+
+```python
+from datetime import datetime
+
+# Get cache and check if still valid
+cache_name = 'cachedContents/abc123'
+cached = client.caches.get(name=cache_name)
+
+if cached.expire_time > datetime.now():
+    print("Cache is still valid")
+    # Use the cache
+    response = client.models.generate_content(
+        model=cached.name,
+        contents='Query using cached context'
+    )
+    print(response.text)
+else:
+    print("Cache has expired")
+```
+
+### Inspect Cache Contents
+
+```python
+# Get cache and examine its contents
+cached = client.caches.get(name='cachedContents/abc123')
+
+print(f"Cache: {cached.display_name}")
+print(f"Number of content items: {len(cached.contents)}")
+
+for i, content in enumerate(cached.contents):
+    print(f"Content {i + 1}:")
+    print(f"  Role: {content.role}")
+    print(f"  Parts: {len(content.parts)}")
+    for part in content.parts:
+        if part.text:
+            print(f"    Text: {part.text[:100]}...")  # First 100 chars
+        elif part.file_data:
+            print(f"    File: {part.file_data.file_uri}")
+```
+
+### Check System Instructions
+
+```python
+# Examine cached system instructions
+cached = client.caches.get(name='cachedContents/abc123')
+
+if cached.system_instruction:
+    print("System Instruction:")
+    print(cached.system_instruction.parts[0].text)
+else:
+    print("No system instruction cached")
+```
+
+### Monitor Cache Usage
+
+```python
+# Check cache usage metadata
+cached = client.caches.get(name='cachedContents/abc123')
+
+usage = cached.usage_metadata
+print(f"Total tokens: {usage.total_token_count}")
+print(f"Cache storage: {usage.total_token_count * 0.001:.3f}K tokens")
+```
+
+### Get Multiple Caches
+
+```python
+# Retrieve multiple caches
+cache_names = [
+    'cachedContents/abc123',
+    'cachedContents/def456',
+    'cachedContents/ghi789'
+]
+
+for name in cache_names:
+    try:
+        cached = client.caches.get(name=name)
+        print(f"{cached.display_name}: {cached.usage_metadata.total_token_count} tokens")
+    except Exception as e:
+        print(f"Failed to get {name}: {e}")
+```
+
+### Async Get
+
+```python
+import asyncio
+
+async def get_cache():
+    # Get cache asynchronously
+    cached = await client.aio.caches.get(name='cachedContents/abc123')
+    print(f"Cache: {cached.display_name}")
+    print(f"Expires: {cached.expire_time}")
+    return cached
+
+asyncio.run(get_cache())
+```
+
+### Refresh Cache if Expiring Soon
+
+```python
+from datetime import datetime, timedelta
+
+def ensure_fresh_cache(cache_name: str, min_remaining: timedelta):
+    """Check cache and extend if expiring soon."""
+    cached = client.caches.get(name=cache_name)
+    
+    time_remaining = cached.expire_time - datetime.now()
+    
+    if time_remaining < min_remaining:
+        print(f"Cache expiring soon, extending...")
+        # Extend the cache by 1 hour
+        updated = client.caches.update(
+            name=cache_name,
+            config={'ttl': '3600s'}
+        )
+        print(f"Extended to: {updated.expire_time}")
+        return updated
+    else:
+        print(f"Cache still fresh, {time_remaining} remaining")
+        return cached
+
+# Ensure cache has at least 30 minutes remaining
+cached = ensure_fresh_cache(
+    'cachedContents/abc123',
+    min_remaining=timedelta(minutes=30)
+)
+```
+
+### Compare Cache Configurations
+
+```python
+# Compare two caches
+cache1 = client.caches.get(name='cachedContents/abc123')
+cache2 = client.caches.get(name='cachedContents/def456')
+
+print("Cache Comparison:")
+print(f"Cache 1: {cache1.display_name}")
+print(f"  Model: {cache1.model}")
+print(f"  Tokens: {cache1.usage_metadata.total_token_count}")
+print(f"  Expires: {cache1.expire_time}")
+print()
+print(f"Cache 2: {cache2.display_name}")
+print(f"  Model: {cache2.model}")
+print(f"  Tokens: {cache2.usage_metadata.total_token_count}")
+print(f"  Expires: {cache2.expire_time}")
+```
+
+### Extract Tools Configuration
+
+```python
+# Get tools from cached content
+cached = client.caches.get(name='cachedContents/abc123')
+
+if cached.tools:
+    print(f"Cached tools: {len(cached.tools)}")
+    for tool in cached.tools:
+        if tool.function_declarations:
+            print("Function declarations:")
+            for func in tool.function_declarations:
+                print(f"  - {func.name}: {func.description}")
+```
+
+### Validate Cache Exists
+
+```python
+def cache_exists(cache_name: str) -> bool:
+    """Check if a cache exists."""
+    try:
+        client.caches.get(name=cache_name)
+        return True
+    except Exception:
+        return False
+
+if cache_exists('cachedContents/abc123'):
+    print("Cache found")
+else:
+    print("Cache not found or expired")
+```
+
+## Usage Metadata
+
+<Info>
+The `usage_metadata` field provides information about cached token counts:
+- `total_token_count`: Total tokens in the cache
+
+This helps track storage costs and cache efficiency.
+</Info>
+
+## Error Handling
+
+```python
+try:
+    cached = client.caches.get(name='cachedContents/abc123')
+    print(f"Found: {cached.display_name}")
+except Exception as e:
+    if "not found" in str(e).lower():
+        print("Cache does not exist or has expired")
+    else:
+        print(f"Error: {e}")
+```
+
+## API Availability
+
+<Note>
+This method is available in both **Gemini API** and **Vertex AI**.
+</Note>
+
+## Related Methods
+
+- [caches.create](/api/caches/create) - Create a new cache
+- [caches.update](/api/caches/update) - Update cache expiration
+- [caches.delete](/api/caches/delete) - Delete a cache
+- [caches.list](/api/caches/list) - List all caches

@@ -1,0 +1,310 @@
+---
+title: 'batches.list'
+description: 'List all batch prediction jobs'
+---
+
+## Method
+
+```python
+client.batches.list(
+    config: Optional[ListBatchJobsConfig] = None
+) -> Pager[BatchJob]
+```
+
+Returns a paginated list of all batch jobs in your project. The pager automatically handles pagination when iterating through results.
+
+<ParamField path="config" type="ListBatchJobsConfig">
+  Configuration options for the list request
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="page_size" type="int">
+      Maximum number of batch jobs to return per page. Default varies by backend.
+    </ParamField>
+    
+    <ParamField path="page_token" type="string">
+      Token for retrieving a specific page. Usually obtained from a previous list response.
+    </ParamField>
+    
+    <ParamField path="filter" type="string">
+      Filter expression to limit results (Vertex AI only). 
+      
+      Examples:
+      - `state=JOB_STATE_SUCCEEDED`
+      - `create_time>"2024-01-01T00:00:00Z"`
+      - `display_name="my-batch"`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns a `Pager[BatchJob]` object that implements the iterator protocol. Each iteration yields a `BatchJob` object.
+
+<ResponseField name="BatchJob" type="object">
+  Each batch job in the list contains:
+  
+  <Expandable title="BatchJob Fields">
+    <ResponseField name="name" type="string">
+      The resource name of the batch job
+    </ResponseField>
+    
+    <ResponseField name="display_name" type="string">
+      Display name of the job
+    </ResponseField>
+    
+    <ResponseField name="state" type="JobState">
+      Current state of the job
+    </ResponseField>
+    
+    <ResponseField name="create_time" type="string">
+      When the job was created
+    </ResponseField>
+    
+    <ResponseField name="model" type="string">
+      The model being used
+    </ResponseField>
+    
+    <ResponseField name="dest" type="BatchJobDestination">
+      Output destination information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage
+
+### List All Batch Jobs
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Iterate through all batch jobs
+for batch_job in client.batches.list():
+    print(f"Job: {batch_job.name}")
+    print(f"State: {batch_job.state}")
+    print(f"Created: {batch_job.create_time}")
+    print("---")
+```
+
+### With Pagination Control
+
+```python
+from google.genai import types
+
+# Get first page with 10 jobs
+config = types.ListBatchJobsConfig(page_size=10)
+pager = client.batches.list(config=config)
+
+# Process first page
+first_page = list(pager)
+print(f"First page has {len(first_page)} jobs")
+
+# Get next page if available
+if pager.next_page_token:
+    config.page_token = pager.next_page_token
+    next_pager = client.batches.list(config=config)
+    next_page = list(next_pager)
+    print(f"Next page has {len(next_page)} jobs")
+```
+
+### Filter by State (Vertex AI)
+
+```python
+from google.genai import types
+
+# List only successful batch jobs
+config = types.ListBatchJobsConfig(
+    filter='state=JOB_STATE_SUCCEEDED'
+)
+
+for batch_job in client.batches.list(config=config):
+    print(f"Completed job: {batch_job.name}")
+    print(f"Output: {batch_job.dest.gcs_uri}")
+```
+
+### Monitor Active Jobs
+
+```python
+from google.genai import types
+
+# Find all running jobs
+active_states = [
+    types.JobState.JOB_STATE_RUNNING,
+    types.JobState.JOB_STATE_PENDING,
+    types.JobState.JOB_STATE_QUEUED
+]
+
+active_jobs = []
+for batch_job in client.batches.list():
+    if batch_job.state in active_states:
+        active_jobs.append(batch_job)
+        print(f"Active: {batch_job.name}")
+        print(f"  State: {batch_job.state}")
+        print(f"  Model: {batch_job.model}")
+        print(f"  Started: {batch_job.start_time or 'Not started'}")
+
+print(f"\nTotal active jobs: {len(active_jobs)}")
+```
+
+### List Recent Jobs
+
+```python
+from datetime import datetime, timedelta
+
+# Get jobs from the last 24 hours
+day_ago = datetime.now() - timedelta(days=1)
+
+recent_jobs = []
+for batch_job in client.batches.list():
+    job_time = datetime.fromisoformat(
+        batch_job.create_time.replace('Z', '+00:00')
+    )
+    if job_time > day_ago:
+        recent_jobs.append(batch_job)
+
+print(f"Found {len(recent_jobs)} jobs in the last 24 hours")
+
+for job in recent_jobs:
+    print(f"{job.name}: {job.state}")
+```
+
+### Filter with Complex Criteria (Vertex AI)
+
+```python
+from google.genai import types
+
+# Jobs created after a date using a specific model
+config = types.ListBatchJobsConfig(
+    filter='create_time>"2024-01-01T00:00:00Z" AND '
+           'model="gemini-2.0-flash-001"',
+    page_size=50
+)
+
+for batch_job in client.batches.list(config=config):
+    print(f"Job: {batch_job.display_name}")
+    print(f"Created: {batch_job.create_time}")
+```
+
+### Generate Job Summary
+
+```python
+from collections import defaultdict
+from google.genai import types
+
+# Count jobs by state
+state_counts = defaultdict(int)
+total_jobs = 0
+
+for batch_job in client.batches.list():
+    state_counts[batch_job.state] += 1
+    total_jobs += 1
+
+print(f"Total batch jobs: {total_jobs}")
+print("\nJobs by state:")
+for state, count in sorted(state_counts.items()):
+    print(f"  {state}: {count}")
+```
+
+### Find Failed Jobs
+
+```python
+from google.genai import types
+
+# Find and analyze failed jobs
+failed_jobs = []
+
+for batch_job in client.batches.list():
+    if batch_job.state == types.JobState.JOB_STATE_FAILED:
+        failed_jobs.append(batch_job)
+        print(f"Failed job: {batch_job.name}")
+        print(f"  Created: {batch_job.create_time}")
+        print(f"  Model: {batch_job.model}")
+        if batch_job.error:
+            print(f"  Error: {batch_job.error}")
+        print("---")
+
+print(f"\nTotal failed jobs: {len(failed_jobs)}")
+```
+
+### Export Job List
+
+```python
+import json
+from datetime import datetime
+
+# Collect all batch jobs
+jobs_data = []
+for batch_job in client.batches.list():
+    jobs_data.append({
+        'name': batch_job.name,
+        'display_name': batch_job.display_name,
+        'state': batch_job.state,
+        'model': batch_job.model,
+        'create_time': batch_job.create_time,
+        'start_time': batch_job.start_time,
+        'end_time': batch_job.end_time,
+    })
+
+# Save to file
+filename = f'batch_jobs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+with open(filename, 'w') as f:
+    json.dump(jobs_data, f, indent=2)
+
+print(f"Exported {len(jobs_data)} batch jobs to {filename}")
+```
+
+### Monitor Multiple Jobs
+
+```python
+import time
+from google.genai import types
+
+# Track specific jobs
+job_names = ['batch1', 'batch2', 'batch3']
+
+while True:
+    all_complete = True
+    
+    for batch_job in client.batches.list():
+        if batch_job.name not in job_names:
+            continue
+            
+        print(f"{batch_job.name}: {batch_job.state}")
+        
+        if batch_job.state in [
+            types.JobState.JOB_STATE_RUNNING,
+            types.JobState.JOB_STATE_PENDING,
+            types.JobState.JOB_STATE_QUEUED
+        ]:
+            all_complete = False
+    
+    if all_complete:
+        print("All jobs completed!")
+        break
+    
+    print("Checking again in 60 seconds...\n")
+    time.sleep(60)
+```
+
+## Notes
+
+- The pager automatically fetches additional pages as you iterate
+- Jobs are returned in reverse chronological order (newest first)
+- Page size defaults vary between Gemini API and Vertex AI
+- Filtering is only supported on Vertex AI
+- The list includes jobs in all states unless filtered
+
+## Performance Tips
+
+- Use `page_size` to control memory usage when listing many jobs
+- Apply filters on the server side (Vertex AI) instead of filtering in code
+- Cache job lists if you need to reference them multiple times
+- Use specific filters to reduce data transfer and processing time
+
+## See Also
+
+- [batches.get](/api/batches/get) - Get details of a specific job
+- [batches.create](/api/batches/create) - Create a new batch job
+- [batches.cancel](/api/batches/cancel) - Cancel a running job
+- [batches.delete](/api/batches/delete) - Delete a batch job

@@ -1,0 +1,250 @@
+---
+title: chat.send_message
+description: Send messages in a chat session with streaming support
+---
+
+Sends a message in the chat session and receives the model's response. The chat maintains conversation history automatically.
+
+## Method Signatures
+
+### send_message (Non-streaming)
+
+```python
+chat.send_message(
+    message: Union[list[PartUnionDict], PartUnionDict],
+    config: Optional[GenerateContentConfigOrDict] = None
+) -> GenerateContentResponse
+```
+
+### send_message_stream (Streaming)
+
+```python
+chat.send_message_stream(
+    message: Union[list[PartUnionDict], PartUnionDict],
+    config: Optional[GenerateContentConfigOrDict] = None
+) -> Iterator[GenerateContentResponse]
+```
+
+## Parameters
+
+<ParamField path="message" type="string | Part | list[Part]" required>
+  The message to send to the model.
+  
+  Can be:
+  - A simple string: `"Tell me a story"`
+  - A Part object: `Part(text="Hello")`
+  - A list of Parts: `[Part(text="Describe this:"), Part(inline_data=image)]`
+  
+  Supported part types:
+  - Text
+  - Images (PIL Image, bytes, or file data)
+  - Video
+  - Audio
+  - File references
+</ParamField>
+
+<ParamField path="config" type="GenerateContentConfig">
+  Optional configuration to override the chat's default config for this specific request.
+  
+  Common options:
+  - `temperature`: Controls randomness
+  - `max_output_tokens`: Maximum response length
+  - `top_p`, `top_k`: Sampling parameters
+  - `response_mime_type`: Output format (e.g., `"application/json"`)
+</ParamField>
+
+## Returns
+
+### send_message
+
+<ResponseField name="response" type="GenerateContentResponse">
+  The complete model response containing:
+  - `text`: The response text
+  - `candidates`: List of response candidates
+  - `usage_metadata`: Token usage information
+  - `model_version`: The model version used
+</ResponseField>
+
+### send_message_stream
+
+<ResponseField name="chunks" type="Iterator[GenerateContentResponse]">
+  An iterator that yields response chunks as they're generated.
+  
+  Each chunk contains partial content that can be displayed incrementally.
+</ResponseField>
+
+## Examples
+
+### Basic Text Message
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Create chat
+chat = client.chats.create(model='gemini-2.0-flash')
+
+# Send message
+response = chat.send_message('Tell me a story about a robot')
+print(response.text)
+```
+
+### Streaming Response
+
+```python
+# Create chat
+chat = client.chats.create(model='gemini-2.0-flash')
+
+# Stream the response
+for chunk in chat.send_message_stream('Write a poem about the ocean'):
+    print(chunk.text, end='')
+print()  # New line after streaming completes
+```
+
+### Message with Image
+
+```python
+from google.genai import types
+from PIL import Image
+
+# Load image
+image = Image.open('photo.jpg')
+
+# Create chat
+chat = client.chats.create(model='gemini-2.0-flash')
+
+# Send message with image
+response = chat.send_message([
+    'What do you see in this image?',
+    image
+])
+print(response.text)
+```
+
+### Override Configuration
+
+```python
+# Create chat with default config
+chat = client.chats.create(
+    model='gemini-2.0-flash',
+    config={'temperature': 0.5}
+)
+
+# Override config for a specific message
+response = chat.send_message(
+    'Be creative and write a story',
+    config={'temperature': 1.5}  # More creative for this message
+)
+print(response.text)
+```
+
+### Multi-turn Conversation
+
+```python
+# Create chat
+chat = client.chats.create(model='gemini-2.0-flash')
+
+# First turn
+response = chat.send_message('What is the capital of France?')
+print(f"Assistant: {response.text}")
+
+# Second turn - chat remembers context
+response = chat.send_message('What is its population?')
+print(f"Assistant: {response.text}")
+
+# Third turn
+response = chat.send_message('What are some famous landmarks there?')
+print(f"Assistant: {response.text}")
+```
+
+### JSON Output
+
+```python
+import json
+
+chat = client.chats.create(model='gemini-2.0-flash')
+
+response = chat.send_message(
+    'List 3 colors with their hex codes',
+    config={'response_mime_type': 'application/json'}
+)
+
+colors = json.loads(response.text)
+print(colors)
+```
+
+### Async Streaming
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def stream_example():
+    # Create async chat
+    chat = client.aio.chats.create(model='gemini-2.0-flash')
+    
+    # Stream response asynchronously
+    async for chunk in await chat.send_message_stream('Tell me a story'):
+        print(chunk.text, end='')
+    print()
+
+asyncio.run(stream_example())
+```
+
+### File Upload in Chat
+
+```python
+# Upload a file first
+file = client.files.upload(file='document.pdf')
+
+# Use in chat
+chat = client.chats.create(model='gemini-2.0-flash')
+response = chat.send_message([
+    types.Part(file_data=types.FileData(file_uri=file.uri)),
+    'Summarize this document'
+])
+print(response.text)
+```
+
+### Access Chat History
+
+```python
+chat = client.chats.create(model='gemini-2.0-flash')
+
+# Send some messages
+chat.send_message('Hello')
+chat.send_message('How are you?')
+
+# Get comprehensive history (includes all turns)
+history = chat.get_history(curated=False)
+for content in history:
+    print(f"{content.role}: {content.parts[0].text}")
+
+# Get curated history (only valid turns)
+curated_history = chat.get_history(curated=True)
+```
+
+## Error Handling
+
+```python
+try:
+    chat = client.chats.create(model='gemini-2.0-flash')
+    response = chat.send_message('Hello')
+    print(response.text)
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+## API Availability
+
+<Note>
+These methods are available in both **Gemini API** and **Vertex AI**.
+</Note>
+
+## Related Methods
+
+- [chats.create](/api/chats/create) - Create a new chat session
+- [models.generate_content](/api/models/generate-content) - Single-turn generation

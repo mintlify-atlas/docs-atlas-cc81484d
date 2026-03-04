@@ -1,0 +1,115 @@
+---
+title: Model Context Protocol (MCP)
+description: Integrate MCP servers as tools for your Gemini models
+---
+
+<Warning>
+Built-in MCP support is an experimental feature. APIs may change in future releases.
+</Warning>
+
+The Google Gen AI Python SDK has built-in support for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction), allowing you to connect to MCP servers and use them as tools for your models.
+
+## What is MCP?
+
+The Model Context Protocol (MCP) is an open standard that enables AI models to securely access external data sources and tools. MCP servers provide a standardized way to expose tools, resources, and prompts that models can interact with.
+
+## Using MCP Servers as Tools
+
+You can pass an MCP session directly as a tool in your generate content requests. The SDK will automatically handle function calling with the MCP server.
+
+### Basic Example
+
+Here's a complete example using a weather MCP server:
+
+```python
+import os
+import asyncio
+from datetime import datetime
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from google import genai
+
+client = genai.Client()
+
+# Create server parameters for stdio connection
+server_params = StdioServerParameters(
+    command="npx",  # Executable
+    args=["-y", "@philschmid/weather-mcp"],  # MCP Server
+    env=None,  # Optional environment variables
+)
+
+async def run():
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            # Prompt to get the weather for the current day in London.
+            prompt = f"What is the weather in London in {datetime.now().strftime('%Y-%m-%d')}?"
+            
+            # Initialize the connection between client and server
+            await session.initialize()
+            
+            # Send request to the model with MCP function declarations
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    temperature=0,
+                    tools=[session],  # Pass the session as a tool
+                ),
+            )
+            print(response.text)
+
+# Start the asyncio event loop and run the main function
+asyncio.run(run())
+```
+
+## How It Works
+
+1. **Create server parameters**: Define the MCP server command, arguments, and optional environment variables
+2. **Establish connection**: Use `stdio_client` to connect to the MCP server
+3. **Initialize session**: Create a `ClientSession` and initialize the connection
+4. **Pass session as tool**: Add the session to the `tools` list in your `GenerateContentConfig`
+5. **Automatic function calling**: The SDK automatically calls the MCP server's tools using the automatic function calling feature
+
+## Server Parameters
+
+When creating `StdioServerParameters`, you can specify:
+
+- `command`: The executable to run (e.g., "npx", "python", "node")
+- `args`: Arguments to pass to the executable (e.g., ["-y", "@philschmid/weather-mcp"])
+- `env`: Optional dictionary of environment variables for the server process
+
+## Available MCP Servers
+
+You can use any MCP-compatible server, including:
+
+- **Weather MCP**: `@philschmid/weather-mcp` - Get weather information
+- **File System MCP**: Access local file systems
+- **Database MCP**: Query databases
+- **API MCP**: Interact with REST APIs
+- **Custom MCP servers**: Build your own using the MCP protocol
+
+For a list of available MCP servers, visit the [Model Context Protocol documentation](https://modelcontextprotocol.io/).
+
+## Requirements
+
+<Note>
+MCP support requires async/await and the `mcp` Python package:
+
+```bash
+pip install mcp
+```
+</Note>
+
+## Limitations
+
+- MCP support is currently experimental and may change in future releases
+- Only async operations are supported (use `client.aio.models.generate_content`)
+- The MCP session must be initialized before being used as a tool
+- Automatic function calling is required for MCP sessions
+
+## Best Practices
+
+- **Always initialize**: Call `await session.initialize()` before using the session as a tool
+- **Use context managers**: Properly manage connections with `async with` statements
+- **Handle errors**: Wrap MCP operations in try-except blocks for better error handling
+- **Set temperature**: Use lower temperatures (0-0.5) for more deterministic tool usage

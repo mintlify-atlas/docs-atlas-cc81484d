@@ -1,0 +1,322 @@
+---
+title: "generate_content"
+description: "Generate text and multimodal content using Gemini models"
+---
+
+## Method Signature
+
+```python
+def generate_content(
+    self,
+    *,
+    model: str,
+    contents: ContentListUnionDict,
+    config: Optional[GenerateContentConfigOrDict] = None,
+) -> GenerateContentResponse
+```
+
+```python
+async def generate_content(
+    self,
+    *,
+    model: str,
+    contents: ContentListUnionDict,
+    config: Optional[GenerateContentConfigOrDict] = None,
+) -> GenerateContentResponse
+```
+
+## Description
+
+Makes an API request to generate content using a Gemini model. Supports text-only and multimodal input/output, including images, audio, and video.
+
+The method includes built-in support for automatic function calling (AFC) when tools are provided. MCP (Model Context Protocol) support is available as an experimental feature.
+
+## Parameters
+
+<ParamField path="model" type="str" required>
+  The model to use for generation.
+  
+  **Vertex AI formats:**
+  - Model ID: `'gemini-2.0-flash'`
+  - Full resource name: `'projects/my-project/locations/us-central1/publishers/google/models/gemini-2.0-flash'`
+  - Partial resource name: `'publishers/google/models/gemini-2.0-flash'`
+  - Publisher/model: `'google/gemini-2.0-flash'`
+  
+  **Gemini API formats:**
+  - Model ID: `'gemini-2.0-flash'`
+  - Model name: `'models/gemini-2.0-flash'`
+  - Tuned model: `'tunedModels/1234567890123456789'`
+</ParamField>
+
+<ParamField path="contents" type="ContentListUnionDict" required>
+  The conversation history or input prompt to generate content from.
+  
+  Can be:
+  - A string: `'What is your name?'`
+  - A list of Content objects
+  - A list of Part objects
+  - Mixed content with text, images, video, and audio
+</ParamField>
+
+<ParamField path="config" type="GenerateContentConfig">
+  Configuration for content generation.
+  
+  <Expandable title="config properties">
+    <ParamField path="system_instruction" type="Content">
+      System instructions to guide model behavior
+    </ParamField>
+    
+    <ParamField path="temperature" type="float">
+      Controls randomness in output (0.0 to 2.0). Higher values increase creativity.
+    </ParamField>
+    
+    <ParamField path="top_p" type="float">
+      Nucleus sampling threshold (0.0 to 1.0)
+    </ParamField>
+    
+    <ParamField path="top_k" type="int">
+      Top-k sampling parameter
+    </ParamField>
+    
+    <ParamField path="candidate_count" type="int">
+      Number of response candidates to generate
+    </ParamField>
+    
+    <ParamField path="max_output_tokens" type="int">
+      Maximum number of tokens in the response
+    </ParamField>
+    
+    <ParamField path="stop_sequences" type="list[str]">
+      Sequences that stop generation when encountered
+    </ParamField>
+    
+    <ParamField path="response_mime_type" type="str">
+      MIME type for structured output (e.g., `'application/json'`)
+    </ParamField>
+    
+    <ParamField path="response_schema" type="Schema">
+      Schema for structured JSON output
+    </ParamField>
+    
+    <ParamField path="response_json_schema" type="dict">
+      JSON schema for structured output
+    </ParamField>
+    
+    <ParamField path="safety_settings" type="list[SafetySetting]">
+      Safety filter configurations
+    </ParamField>
+    
+    <ParamField path="tools" type="list[Tool]">
+      Function calling tools or code execution tools
+    </ParamField>
+    
+    <ParamField path="tool_config" type="ToolConfig">
+      Configuration for tool usage
+    </ParamField>
+    
+    <ParamField path="cached_content" type="str">
+      Name of cached content to use
+    </ParamField>
+    
+    <ParamField path="response_modalities" type="list[str]">
+      Desired modalities in response (e.g., `['TEXT', 'IMAGE']`)
+    </ParamField>
+    
+    <ParamField path="thinking_config" type="ThinkingConfig">
+      Configuration for thinking process (experimental)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="candidates" type="list[Candidate]">
+  List of generated response candidates
+  
+  <Expandable title="Candidate properties">
+    <ResponseField name="content" type="Content">
+      The generated content
+    </ResponseField>
+    
+    <ResponseField name="finish_reason" type="str">
+      Why generation stopped (e.g., `'STOP'`, `'MAX_TOKENS'`, `'SAFETY'`)
+    </ResponseField>
+    
+    <ResponseField name="safety_ratings" type="list[SafetyRating]">
+      Safety ratings for the candidate
+    </ResponseField>
+    
+    <ResponseField name="citation_metadata" type="CitationMetadata">
+      Citation information for grounded content
+    </ResponseField>
+    
+    <ResponseField name="token_count" type="int">
+      Number of tokens in the candidate
+    </ResponseField>
+    
+    <ResponseField name="grounding_metadata" type="GroundingMetadata">
+      Grounding attributions
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage_metadata" type="UsageMetadata">
+  Token usage information
+  
+  <Expandable title="properties">
+    <ResponseField name="prompt_token_count" type="int">
+      Tokens in the prompt
+    </ResponseField>
+    
+    <ResponseField name="candidates_token_count" type="int">
+      Tokens in all candidates
+    </ResponseField>
+    
+    <ResponseField name="total_token_count" type="int">
+      Total tokens used
+    </ResponseField>
+    
+    <ResponseField name="cached_content_token_count" type="int">
+      Tokens from cached content
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="prompt_feedback" type="PromptFeedback">
+  Feedback about the prompt (e.g., safety blocks)
+</ResponseField>
+
+<ResponseField name="model_version" type="str">
+  The model version used
+</ResponseField>
+
+<ResponseField name="text" type="str">
+  Convenience property: text from the first candidate
+</ResponseField>
+
+## Code Examples
+
+### Basic Text Generation
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+response = client.models.generate_content(
+    model='gemini-2.0-flash',
+    contents='What is a good name for a flower shop?'
+)
+
+print(response.text)
+# Output: **Elegant & Classic:**
+# * The Dried Bloom
+# * Everlasting Florals
+```
+
+### Multimodal Generation (Image Input)
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+response = client.models.generate_content(
+    model='gemini-2.0-flash',
+    contents=[
+        types.Part.from_text('What is shown in this image?'),
+        types.Part.from_uri(
+            file_uri='gs://generativeai-downloads/images/scones.jpg',
+            mime_type='image/jpeg'
+        )
+    ]
+)
+
+print(response.text)
+# Output: The image shows freshly baked blueberry scones.
+```
+
+### Structured JSON Output
+
+```python
+response = client.models.generate_content(
+    model='gemini-2.0-flash',
+    contents='List 3 popular cookie recipes',
+    config={
+        'response_mime_type': 'application/json',
+        'response_schema': {
+            'type': 'object',
+            'properties': {
+                'recipes': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'name': {'type': 'string'},
+                            'ingredients': {'type': 'array', 'items': {'type': 'string'}}
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+
+print(response.text)
+# Output: {"recipes": [{"name": "Chocolate Chip", ...}]}
+```
+
+### Function Calling (Automatic)
+
+```python
+from google.genai import types
+
+def get_weather(location: str) -> str:
+    """Get the weather for a location."""
+    return f"Sunny, 72°F in {location}"
+
+response = client.models.generate_content(
+    model='gemini-2.0-flash',
+    contents='What is the weather in San Francisco?',
+    config=types.GenerateContentConfig(
+        tools=[get_weather],
+    )
+)
+
+print(response.text)
+# The function is automatically called and the result is used
+# Output: The weather in San Francisco is sunny and 72°F.
+```
+
+### Async Usage
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def generate():
+    response = await client.aio.models.generate_content(
+        model='gemini-2.0-flash',
+        contents='Write a haiku about programming'
+    )
+    print(response.text)
+
+asyncio.run(generate())
+```
+
+## Notes
+
+- The method automatically handles function calling when Python callables are provided in `tools`
+- MCP (Model Context Protocol) sessions are only supported in async methods
+- Use `generate_content_stream` for streaming responses
+- Multimodal input is supported for Gemini 2.0 and later models
+- Some configuration options are only available on Vertex AI or Gemini API
+
+## Related Methods
+
+- [generate_content_stream](/api/models/generate-content-stream) - Streaming version
+- [count_tokens](/api/models/count-tokens) - Count tokens before generating
+- [embed_content](/api/models/embed-content) - Generate embeddings

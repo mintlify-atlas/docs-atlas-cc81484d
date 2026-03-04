@@ -1,0 +1,397 @@
+---
+title: Configuration Types
+description: Types for configuring API requests and behavior
+---
+
+## Overview
+
+Configuration types control various aspects of API requests, including generation parameters, HTTP options, and retry behavior.
+
+## GenerateContentConfig
+
+Main configuration for content generation requests.
+
+### Generation Parameters
+
+<ParamField path="temperature" type="float">
+  Controls randomness in token selection. Range: 0.0 to 2.0.
+  - Lower values (e.g., 0.2): More deterministic, focused responses
+  - Higher values (e.g., 1.5): More creative, diverse responses
+</ParamField>
+
+<ParamField path="top_p" type="float">
+  Nucleus sampling parameter. Range: 0.0 to 1.0.
+  Tokens are selected from smallest set whose cumulative probability exceeds top_p.
+</ParamField>
+
+<ParamField path="top_k" type="float">
+  Number of highest probability tokens to consider at each step.
+</ParamField>
+
+<ParamField path="max_output_tokens" type="int">
+  Maximum number of tokens in the response.
+</ParamField>
+
+<ParamField path="candidate_count" type="int">
+  Number of response variations to generate.
+</ParamField>
+
+<ParamField path="stop_sequences" type="list[str]">
+  List of strings that stop generation when encountered.
+</ParamField>
+
+<ParamField path="seed" type="int">
+  Random seed for reproducible outputs.
+</ParamField>
+
+### Response Configuration
+
+<ParamField path="response_mime_type" type="str">
+  Output format for the response.
+  - `"text/plain"`: Plain text (default)
+  - `"application/json"`: JSON response
+</ParamField>
+
+<ParamField path="response_schema" type="SchemaUnion">
+  Schema object defining expected response structure. Use with `response_mime_type="application/json"`.
+</ParamField>
+
+<ParamField path="response_json_schema" type="Any">
+  JSON Schema for response validation. Alternative to `response_schema` with full JSON Schema support.
+</ParamField>
+
+<ParamField path="response_logprobs" type="bool">
+  Whether to return log probabilities of chosen tokens.
+</ParamField>
+
+<ParamField path="logprobs" type="int">
+  Number of top candidate tokens to return log probabilities for.
+</ParamField>
+
+### Instructions and Tools
+
+<ParamField path="system_instruction" type="ContentUnion">
+  Instructions to steer model behavior (e.g., "Answer concisely", "You are a helpful assistant").
+</ParamField>
+
+<ParamField path="tools" type="ToolListUnion">
+  List of tools the model can use (functions, code execution, search).
+</ParamField>
+
+<ParamField path="tool_config" type="ToolConfig">
+  Configuration for tool usage and function calling.
+</ParamField>
+
+<ParamField path="automatic_function_calling" type="AutomaticFunctionCallingConfig">
+  Configuration for automatic function calling.
+</ParamField>
+
+### Safety and Filtering
+
+<ParamField path="safety_settings" type="list[SafetySetting]">
+  Safety settings to block unsafe content.
+</ParamField>
+
+<ParamField path="model_armor_config" type="ModelArmorConfig">
+  Model Armor configuration for prompt/response sanitization. Cannot be used with `safety_settings`.
+</ParamField>
+
+### Media Configuration
+
+<ParamField path="media_resolution" type="MediaResolution">
+  Default media resolution for all media in the request.
+</ParamField>
+
+<ParamField path="response_modalities" type="list[str]">
+  Modalities the model can return (e.g., ["TEXT", "IMAGE", "AUDIO"]).
+</ParamField>
+
+<ParamField path="speech_config" type="SpeechConfigUnion">
+  Configuration for speech generation.
+</ParamField>
+
+<ParamField path="audio_timestamp" type="bool">
+  Whether to include audio timestamps in the request.
+</ParamField>
+
+<ParamField path="image_config" type="ImageConfig">
+  Configuration for image generation.
+</ParamField>
+
+### Advanced Options
+
+<ParamField path="presence_penalty" type="float">
+  Penalizes tokens that have appeared, encouraging diverse content.
+</ParamField>
+
+<ParamField path="frequency_penalty" type="float">
+  Penalizes frequently repeated tokens.
+</ParamField>
+
+<ParamField path="thinking_config" type="ThinkingConfig">
+  Configuration for model thinking/reasoning features.
+</ParamField>
+
+<ParamField path="routing_config" type="GenerationConfigRoutingConfig">
+  Configuration for model routing.
+</ParamField>
+
+<ParamField path="model_selection_config" type="ModelSelectionConfig">
+  Configuration for model selection.
+</ParamField>
+
+<ParamField path="cached_content" type="str">
+  Resource name of cached content to use.
+</ParamField>
+
+<ParamField path="labels" type="dict[str, str]">
+  User-defined metadata labels for billing breakdown.
+</ParamField>
+
+<ParamField path="http_options" type="HttpOptions">
+  HTTP request options (see below).
+</ParamField>
+
+<ParamField path="should_return_http_response" type="bool">
+  Whether to return raw HTTP response in `sdk_http_response` field.
+</ParamField>
+
+### Example
+
+```python
+from google.genai.types import GenerateContentConfig
+
+config = GenerateContentConfig(
+    temperature=0.7,
+    max_output_tokens=1024,
+    top_p=0.95,
+    top_k=40,
+    stop_sequences=["END"],
+    response_mime_type="application/json",
+    system_instruction="You are a helpful assistant that responds in JSON format.",
+    seed=42
+)
+
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents="List 3 colors",
+    config=config
+)
+```
+
+## HttpOptions
+
+HTTP request configuration.
+
+<ParamField path="base_url" type="str">
+  Base URL for the API endpoint.
+</ParamField>
+
+<ParamField path="base_url_resource_scope" type="ResourceScope">
+  Resource scope for constructing resource names with custom base_url.
+</ParamField>
+
+<ParamField path="api_version" type="str">
+  API version to use.
+</ParamField>
+
+<ParamField path="headers" type="dict[str, str]">
+  Additional HTTP headers.
+</ParamField>
+
+<ParamField path="timeout" type="int">
+  Request timeout in milliseconds.
+</ParamField>
+
+<ParamField path="client_args" type="dict[str, Any]">
+  Arguments passed to the HTTP client.
+</ParamField>
+
+<ParamField path="async_client_args" type="dict[str, Any]">
+  Arguments passed to the async HTTP client.
+</ParamField>
+
+<ParamField path="extra_body" type="dict[str, Any]">
+  Extra parameters to add to the request body. Must match backend API structure.
+</ParamField>
+
+<ParamField path="retry_options" type="HttpRetryOptions">
+  HTTP retry configuration (see below).
+</ParamField>
+
+<ParamField path="httpx_client" type="httpx.Client">
+  Custom httpx client for requests.
+</ParamField>
+
+<ParamField path="httpx_async_client" type="httpx.AsyncClient">
+  Custom httpx async client.
+</ParamField>
+
+<ParamField path="aiohttp_client" type="aiohttp.ClientSession">
+  Custom aiohttp client session.
+</ParamField>
+
+### Example
+
+```python
+from google.genai.types import HttpOptions
+
+http_options = HttpOptions(
+    timeout=30000,  # 30 seconds
+    headers={"X-Custom-Header": "value"},
+    retry_options={
+        "attempts": 3,
+        "initial_delay": 1.0
+    }
+)
+
+config = GenerateContentConfig(
+    temperature=0.5,
+    http_options=http_options
+)
+```
+
+## HttpRetryOptions
+
+Retry configuration for HTTP requests.
+
+<ParamField path="attempts" type="int">
+  Maximum number of attempts including the original request. Default: 5.
+  Set to 0 or 1 for no retries.
+</ParamField>
+
+<ParamField path="initial_delay" type="float">
+  Initial delay before first retry in seconds. Default: 1.0.
+</ParamField>
+
+<ParamField path="max_delay" type="float">
+  Maximum delay between retries in seconds. Default: 60.0.
+</ParamField>
+
+<ParamField path="exp_base" type="float">
+  Exponential backoff multiplier. Default: 2.0.
+</ParamField>
+
+<ParamField path="jitter" type="float">
+  Randomness factor for delay. Default: 1.0.
+</ParamField>
+
+<ParamField path="http_status_codes" type="list[int]">
+  HTTP status codes that trigger a retry.
+  Default: 408, 429, and 5xx errors.
+</ParamField>
+
+### Example
+
+```python
+from google.genai.types import HttpRetryOptions
+
+retry_options = HttpRetryOptions(
+    attempts=5,
+    initial_delay=1.0,
+    max_delay=60.0,
+    exp_base=2.0,
+    jitter=0.5,
+    http_status_codes=[408, 429, 500, 502, 503, 504]
+)
+
+http_options = HttpOptions(retry_options=retry_options)
+```
+
+## Common Configuration Patterns
+
+### Creative Writing
+
+```python
+config = GenerateContentConfig(
+    temperature=1.2,
+    top_p=0.95,
+    top_k=50,
+    max_output_tokens=2048
+)
+```
+
+### Deterministic Output
+
+```python
+config = GenerateContentConfig(
+    temperature=0.0,
+    top_p=1.0,
+    seed=12345,
+    max_output_tokens=1024
+)
+```
+
+### JSON Response
+
+```python
+from google.genai.types import GenerateContentConfig, Schema, Type
+
+schema = Schema(
+    type=Type.OBJECT,
+    properties={
+        "name": Schema(type=Type.STRING),
+        "age": Schema(type=Type.INTEGER),
+    },
+    required=["name", "age"]
+)
+
+config = GenerateContentConfig(
+    response_mime_type="application/json",
+    response_schema=schema
+)
+```
+
+### With System Instructions
+
+```python
+config = GenerateContentConfig(
+    system_instruction="""You are a technical documentation expert.
+    Provide clear, concise explanations with code examples.
+    Use markdown formatting.""",
+    temperature=0.3,
+    max_output_tokens=2048
+)
+```
+
+### With Safety Settings
+
+```python
+from google.genai.types import (
+    GenerateContentConfig,
+    SafetySetting,
+    HarmCategory,
+    HarmBlockThreshold
+)
+
+config = GenerateContentConfig(
+    safety_settings=[
+        SafetySetting(
+            category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold=HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
+        ),
+        SafetySetting(
+            category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold=HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
+        )
+    ]
+)
+```
+
+### With Custom Timeout
+
+```python
+config = GenerateContentConfig(
+    temperature=0.7,
+    http_options=HttpOptions(
+        timeout=60000,  # 60 seconds
+        retry_options=HttpRetryOptions(attempts=3)
+    )
+)
+```
+
+## See Also
+
+- [Types Overview](/api/types/overview) - Type system overview
+- [Client Reference](/api/client) - Using config with the client
+- [Content Types](/api/types/content) - Content and Part types

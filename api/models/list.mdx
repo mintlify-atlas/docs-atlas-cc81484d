@@ -1,0 +1,362 @@
+---
+title: "list"
+description: "List available models"
+---
+
+## Method Signature
+
+```python
+def list(
+    self,
+    *,
+    config: Optional[ListModelsConfig] = None,
+) -> Pager[Model]
+```
+
+```python
+async def list(
+    self,
+    *,
+    config: Optional[ListModelsConfig] = None,
+) -> AsyncPager[Model]
+```
+
+## Description
+
+Makes an API request to list the available models. Returns a paginated response with model information.
+
+By default, returns all available base models. Can be configured to list tuned models instead.
+
+## Parameters
+
+<ParamField path="config" type="ListModelsConfig">
+  Configuration for listing models.
+  
+  <Expandable title="config properties">
+    <ParamField path="page_size" type="int">
+      Maximum number of models per page (default: 50)
+    </ParamField>
+    
+    <ParamField path="page_token" type="str">
+      Token for retrieving the next page of results
+    </ParamField>
+    
+    <ParamField path="query_base" type="bool">
+      Whether to query base models or tuned models.
+      
+      - `True` (default): List base models (e.g., gemini-2.0-flash)
+      - `False`: List tuned models created by you
+    </ParamField>
+    
+    <ParamField path="filter" type="str">
+      Filter expression for models.
+      
+      Example: `'displayName="my-model"'`
+      
+      *Vertex AI only*
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns a `Pager[Model]` object that supports iteration and pagination.
+
+### Pager Properties
+
+<ResponseField name="page" type="list[Model]">
+  Current page of models
+</ResponseField>
+
+<ResponseField name="next_page_token" type="str">
+  Token for the next page (if more results exist)
+</ResponseField>
+
+### Model Properties
+
+<ResponseField name="name" type="str">
+  The model resource name.
+  
+  Examples:
+  - Base model: `'publishers/google/models/gemini-2.0-flash'`
+  - Tuned model: `'projects/my-project/locations/us-central1/models/1234567890'`
+</ResponseField>
+
+<ResponseField name="display_name" type="str">
+  Human-readable model name
+</ResponseField>
+
+<ResponseField name="description" type="str">
+  Model description
+</ResponseField>
+
+<ResponseField name="version" type="str">
+  Model version
+</ResponseField>
+
+<ResponseField name="input_token_limit" type="int">
+  Maximum input tokens supported
+</ResponseField>
+
+<ResponseField name="output_token_limit" type="int">
+  Maximum output tokens supported
+</ResponseField>
+
+<ResponseField name="supported_generation_methods" type="list[str]">
+  Supported methods (e.g., `['generateContent', 'countTokens']`)
+</ResponseField>
+
+<ResponseField name="temperature" type="float">
+  Default temperature
+</ResponseField>
+
+<ResponseField name="max_temperature" type="float">
+  Maximum allowed temperature
+</ResponseField>
+
+<ResponseField name="top_p" type="float">
+  Default top-p value
+</ResponseField>
+
+<ResponseField name="top_k" type="int">
+  Default top-k value
+</ResponseField>
+
+## Code Examples
+
+### List Base Models
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# List all base models
+models = client.models.list()
+
+for model in models:
+    print(f"Model: {model.name}")
+    print(f"  Display name: {model.display_name}")
+    print(f"  Input limit: {model.input_token_limit}")
+    print(f"  Output limit: {model.output_token_limit}")
+    print()
+
+# Output:
+# Model: models/gemini-2.0-flash
+#   Display name: Gemini 2.0 Flash
+#   Input limit: 1048576
+#   Output limit: 8192
+```
+
+### Pagination
+
+```python
+# Get first page with 5 models
+response = client.models.list(config={'page_size': 5})
+
+print("First page:")
+for model in response.page:
+    print(f"  {model.display_name}")
+
+# Get next page
+if response.next_page_token:
+    next_response = client.models.list(
+        config={'page_size': 5, 'page_token': response.next_page_token}
+    )
+    print("\nNext page:")
+    for model in next_response.page:
+        print(f"  {model.display_name}")
+```
+
+### Iterate All Models
+
+```python
+# Automatically handles pagination
+models = client.models.list()
+
+model_names = [model.display_name for model in models]
+print(f"Total models: {len(model_names)}")
+print(f"Models: {', '.join(model_names)}")
+```
+
+### Filter Gemini Models
+
+```python
+models = client.models.list()
+
+gemini_models = [
+    model for model in models 
+    if 'gemini' in model.name.lower()
+]
+
+print("Gemini models:")
+for model in gemini_models:
+    print(f"  {model.display_name}")
+    print(f"    Context: {model.input_token_limit:,} tokens")
+    print(f"    Methods: {', '.join(model.supported_generation_methods)}")
+```
+
+### List Models by Capability
+
+```python
+models = client.models.list()
+
+# Find models supporting embeddings
+embedding_models = [
+    model for model in models
+    if 'embedContent' in model.supported_generation_methods
+]
+
+print("Embedding models:")
+for model in embedding_models:
+    print(f"  {model.display_name}")
+
+# Find models with large context windows
+large_context_models = [
+    model for model in models
+    if model.input_token_limit and model.input_token_limit > 100000
+]
+
+print("\nLarge context models (>100k tokens):")
+for model in large_context_models:
+    print(f"  {model.display_name}: {model.input_token_limit:,} tokens")
+```
+
+### List Tuned Models (Vertex AI)
+
+```python
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+# List your tuned models
+tuned_models = client.models.list(config={'query_base': False})
+
+print("Your tuned models:")
+for model in tuned_models.page:
+    print(f"  Name: {model.name}")
+    print(f"  Display name: {model.display_name}")
+    print(f"  Description: {model.description}")
+    print()
+```
+
+### Filter Models (Vertex AI)
+
+```python
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+# List base models with filter
+response = client.models.list(
+    config={
+        'query_base': True,
+        'filter': 'labels.model-type="gemini"',
+        'page_size': 10,
+    }
+)
+
+print("Filtered models:")
+for model in response.page:
+    print(f"  {model.display_name}")
+```
+
+### Get Model Details
+
+```python
+models = client.models.list()
+
+# Find specific model
+flash_model = next(
+    (m for m in models if 'gemini-2.0-flash' in m.name),
+    None
+)
+
+if flash_model:
+    print(f"Model: {flash_model.display_name}")
+    print(f"Name: {flash_model.name}")
+    print(f"Version: {flash_model.version}")
+    print(f"Description: {flash_model.description}")
+    print(f"\nCapabilities:")
+    print(f"  Input tokens: {flash_model.input_token_limit:,}")
+    print(f"  Output tokens: {flash_model.output_token_limit:,}")
+    print(f"  Temperature range: 0.0 - {flash_model.max_temperature}")
+    print(f"  Top-P default: {flash_model.top_p}")
+    print(f"  Top-K default: {flash_model.top_k}")
+    print(f"\nSupported methods:")
+    for method in flash_model.supported_generation_methods:
+        print(f"  - {method}")
+```
+
+### Async Usage
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def list_models():
+    models = await client.aio.models.list()
+    
+    async for model in models:
+        print(f"{model.display_name}: {model.input_token_limit:,} tokens")
+
+asyncio.run(list_models())
+```
+
+### Compare Model Capabilities
+
+```python
+models = client.models.list()
+
+print("Model Comparison:\n")
+print(f"{'Model':<30} {'Input Tokens':<15} {'Output Tokens':<15}")
+print("-" * 60)
+
+for model in models:
+    if 'gemini' in model.name.lower():
+        name = model.display_name or model.name.split('/')[-1]
+        input_limit = f"{model.input_token_limit:,}" if model.input_token_limit else "N/A"
+        output_limit = f"{model.output_token_limit:,}" if model.output_token_limit else "N/A"
+        print(f"{name:<30} {input_limit:<15} {output_limit:<15}")
+```
+
+## Pagination Notes
+
+The `Pager` object supports two iteration patterns:
+
+1. **Iterate all models** (automatic pagination):
+```python
+models = client.models.list()
+for model in models:  # Automatically fetches all pages
+    print(model.name)
+```
+
+2. **Manual pagination** (more control):
+```python
+response = client.models.list(config={'page_size': 10})
+
+# Process current page
+for model in response.page:
+    print(model.name)
+
+# Get next page if exists
+if response.next_page_token:
+    next_response = client.models.list(
+        config={'page_token': response.next_page_token}
+    )
+```
+
+## Notes
+
+- Default behavior lists base models (`query_base=True`)
+- Set `query_base=False` to list your tuned models
+- Pagination is handled automatically when iterating over the `Pager`
+- Use `page_size` to control number of results per request
+- Model availability varies by API (Gemini API vs Vertex AI)
+- Some model properties may be `None` if not applicable
+- Filter expressions are only supported on Vertex AI
+- Tuned model listing requires Vertex AI and appropriate permissions
+
+## Related Methods
+
+- [models.get](/api/models/get) - Get details for a specific model
+- [generate_content](/api/models/generate-content) - Use a model for generation
+- [embed_content](/api/models/embed-content) - Use a model for embeddings

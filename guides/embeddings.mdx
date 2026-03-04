@@ -1,0 +1,149 @@
+---
+title: Embeddings
+description: Generate embeddings for text and other content types
+---
+
+Embeddings convert text and other content into numerical vectors that capture semantic meaning. These vectors can be used for similarity search, clustering, classification, and other machine learning tasks.
+
+## Generate embeddings
+
+Generate embeddings for a single piece of content:
+
+```python
+response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents='why is the sky blue?',
+)
+print(response)
+```
+
+## Batch embeddings
+
+Generate embeddings for multiple pieces of content:
+
+```python
+from google.genai import types
+
+response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents=['why is the sky blue?', 'What is your age?'],
+    config=types.EmbedContentConfig(output_dimensionality=10),
+)
+
+print(response)
+```
+
+## Dimensionality reduction
+
+Reduce the output dimensionality of embeddings for efficiency:
+
+```python
+from google.genai import types
+
+response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents='why is the sky blue?',
+    config=types.EmbedContentConfig(output_dimensionality=256),
+)
+
+print(len(response.embeddings[0].values))  # 256
+```
+
+The `output_dimensionality` parameter allows you to specify a smaller dimension for the embedding vectors. This can reduce storage and computation costs while maintaining semantic meaning.
+
+## Embedding models
+
+Available embedding models:
+
+- **gemini-embedding-001** - General-purpose text embeddings
+- **text-embedding-004** - Latest text embedding model with improved performance
+
+## Use cases
+
+### Semantic search
+
+Find similar documents by comparing embedding vectors:
+
+```python
+import numpy as np
+
+# Embed documents
+docs = ['Document 1', 'Document 2', 'Document 3']
+response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents=docs,
+)
+doc_embeddings = [emb.values for emb in response.embeddings]
+
+# Embed query
+query_response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents='search query',
+)
+query_embedding = query_response.embeddings[0].values
+
+# Calculate cosine similarity
+similarities = [
+    np.dot(query_embedding, doc_emb) / 
+    (np.linalg.norm(query_embedding) * np.linalg.norm(doc_emb))
+    for doc_emb in doc_embeddings
+]
+
+# Find most similar document
+most_similar_idx = np.argmax(similarities)
+print(f"Most similar: {docs[most_similar_idx]}")
+```
+
+### Clustering
+
+Group similar content together using embedding vectors:
+
+```python
+from sklearn.cluster import KMeans
+
+# Generate embeddings for your content
+response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents=['text1', 'text2', 'text3', 'text4'],
+)
+
+embeddings = [emb.values for emb in response.embeddings]
+
+# Cluster embeddings
+kmeans = KMeans(n_clusters=2)
+kmeans.fit(embeddings)
+
+print(kmeans.labels_)
+```
+
+### Classification
+
+Use embeddings as features for classification tasks:
+
+```python
+from sklearn.linear_model import LogisticRegression
+
+# Generate embeddings for training data
+X_train_embeddings = [...]  # Your training embeddings
+y_train = [...]  # Your labels
+
+# Train classifier
+clf = LogisticRegression()
+clf.fit(X_train_embeddings, y_train)
+
+# Predict on new content
+new_response = client.models.embed_content(
+    model='gemini-embedding-001',
+    contents='new text',
+)
+new_embedding = [new_response.embeddings[0].values]
+prediction = clf.predict(new_embedding)
+```
+
+## Response format
+
+The `embed_content` response contains:
+
+- **embeddings** - List of embedding objects
+  - **values** - The embedding vector (list of floats)
+  - **content** - The original content that was embedded

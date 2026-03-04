@@ -1,0 +1,234 @@
+---
+title: Batch Prediction
+description: Process large-scale batch jobs with Vertex AI and Gemini API
+---
+
+Batch prediction allows you to process large volumes of requests asynchronously, which is more cost-effective than real-time inference for bulk operations.
+
+## Vertex AI batch prediction
+
+<Note>
+Vertex AI batch prediction is only available in Vertex AI, not the Gemini Developer API.
+</Note>
+
+### Create a batch job
+
+Create a batch prediction job with automatic configuration:
+
+```python
+# Specify model and source file only
+# Destination and job display name will be auto-populated
+job = client.batches.create(
+    model='gemini-2.5-flash',
+    src='bq://my-project.my-dataset.my-table',  # or "gs://path/to/input/data"
+)
+
+print(job)
+```
+
+### Input sources
+
+Vertex AI supports multiple input sources:
+
+```python
+# BigQuery source
+job = client.batches.create(
+    model='gemini-2.5-flash',
+    src='bq://my-project.my-dataset.my-table',
+)
+
+# GCS source
+job = client.batches.create(
+    model='gemini-2.5-flash',
+    src='gs://my-bucket/inputs/requests.jsonl',
+)
+```
+
+## Gemini API batch prediction
+
+### Create with inline requests
+
+Create a batch job with requests defined inline:
+
+```python
+# Create a batch job with inlined requests
+batch_job = client.batches.create(
+    model="gemini-2.5-flash",
+    src=[{
+        "contents": [{
+            "parts": [{
+                "text": "Hello!",
+            }],
+            "role": "user",
+        }],
+        "config": {"response_modalities": ["text"]},
+    }],
+)
+
+print(batch_job)
+```
+
+### Create with file input
+
+Create a batch job using an uploaded file:
+
+```python
+from google.genai import types
+
+# Upload the file
+file = client.files.upload(
+    file='myrequests.json',
+    config=types.UploadFileConfig(display_name='test-json')
+)
+
+# Create a batch job with file name
+batch_job = client.batches.create(
+    model="gemini-2.5-flash",
+    src="files/test-json",
+)
+```
+
+### Input file format
+
+The JSONL file should contain one request per line:
+
+```json
+{"key":"request_1", "request": {"contents": [{"parts": [{"text": "Explain how AI works in a few words"}]}], "generation_config": {"response_modalities": ["TEXT"]}}}
+{"key":"request_2", "request": {"contents": [{"parts": [{"text": "Explain how Crypto works in a few words"}]}]}}
+```
+
+## Get batch job status
+
+Check the status of a batch job:
+
+```python
+# Get a job by name
+job = client.batches.get(name=job.name)
+
+print(job.state)
+print(job)
+```
+
+## Poll for completion
+
+Wait for a batch job to complete:
+
+```python
+import time
+
+completed_states = set([
+    'JOB_STATE_SUCCEEDED',
+    'JOB_STATE_FAILED',
+    'JOB_STATE_CANCELLED',
+    'JOB_STATE_PAUSED',
+])
+
+while job.state not in completed_states:
+    print(job.state)
+    job = client.batches.get(name=job.name)
+    time.sleep(30)
+
+if job.state == 'JOB_STATE_SUCCEEDED':
+    print("Batch job completed successfully!")
+    print(f"Output location: {job.output_info.gcs_output_directory}")
+else:
+    print(f"Batch job ended with state: {job.state}")
+```
+
+## List batch jobs
+
+List all batch jobs:
+
+```python
+from google.genai import types
+
+for job in client.batches.list(config=types.ListBatchJobsConfig(page_size=10)):
+    print(job)
+```
+
+### Pagination
+
+Navigate through pages of batch jobs:
+
+```python
+pager = client.batches.list(config=types.ListBatchJobsConfig(page_size=10))
+print(pager.page_size)
+print(pager[0])
+pager.next_page()
+print(pager[0])
+```
+
+### Async listing
+
+```python
+from google.genai import types
+
+async for job in await client.aio.batches.list(
+    config=types.ListBatchJobsConfig(page_size=10)
+):
+    print(job)
+```
+
+With pagination:
+
+```python
+async_pager = await client.aio.batches.list(
+    config=types.ListBatchJobsConfig(page_size=10)
+)
+print(async_pager.page_size)
+print(async_pager[0])
+await async_pager.next_page()
+print(async_pager[0])
+```
+
+## Delete batch jobs
+
+Delete a completed batch job:
+
+```python
+# Delete the job resource
+delete_job = client.batches.delete(name=job.name)
+
+print(delete_job)
+```
+
+## Working with GCS paths
+
+Vertex AI batch jobs use Google Cloud Storage for input and output:
+
+```python
+# Input from GCS
+job = client.batches.create(
+    model='gemini-2.5-flash',
+    src='gs://my-bucket/inputs/requests.jsonl',
+)
+
+# Check the job
+job = client.batches.get(name=job.name)
+
+# Output will be written to GCS
+if job.state == 'JOB_STATE_SUCCEEDED':
+    output_uri = job.output_info.gcs_output_directory
+    print(f"Results available at: {output_uri}")
+```
+
+## Batch job states
+
+Batch jobs progress through these states:
+
+- **JOB_STATE_PENDING** - Job is queued
+- **JOB_STATE_RUNNING** - Job is processing
+- **JOB_STATE_SUCCEEDED** - Job completed successfully
+- **JOB_STATE_FAILED** - Job failed with errors
+- **JOB_STATE_CANCELLED** - Job was cancelled
+- **JOB_STATE_PAUSED** - Job is temporarily paused
+
+## Best practices
+
+- Use batch prediction for large volumes of requests (100+)
+- Monitor job state regularly to detect failures early
+- Store input data in GCS for Vertex AI jobs
+- Set up proper IAM permissions for GCS access
+- Delete completed jobs to clean up resources
+- Use appropriate polling intervals (30-60 seconds)
+- Validate your input format before submitting large jobs

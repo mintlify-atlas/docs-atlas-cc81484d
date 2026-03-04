@@ -1,0 +1,197 @@
+---
+title: 'tunings.list'
+description: 'List all tuning jobs in your project'
+---
+
+## Method
+
+```python
+client.tunings.list(
+    config: Optional[ListTuningJobsConfig] = None
+) -> Pager[TuningJob]
+```
+
+Returns a paginated list of all tuning jobs in your project. The pager automatically handles pagination when iterating.
+
+<ParamField path="config" type="ListTuningJobsConfig">
+  Configuration options for the list request
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="page_size" type="int">
+      Maximum number of tuning jobs to return per page. Default varies by backend.
+    </ParamField>
+    
+    <ParamField path="page_token" type="string">
+      Token for retrieving a specific page. Usually obtained from a previous list response.
+    </ParamField>
+    
+    <ParamField path="filter" type="string">
+      Filter expression to limit results (Vertex AI only). Example: `state=JOB_STATE_SUCCEEDED`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns a `Pager[TuningJob]` object that implements the iterator protocol. Each iteration yields a `TuningJob` object.
+
+<ResponseField name="TuningJob" type="object">
+  Each tuning job in the list contains:
+  
+  <Expandable title="TuningJob Fields">
+    <ResponseField name="name" type="string">
+      The resource name of the tuning job
+    </ResponseField>
+    
+    <ResponseField name="state" type="JobState">
+      Current state of the job
+    </ResponseField>
+    
+    <ResponseField name="create_time" type="string">
+      When the job was created
+    </ResponseField>
+    
+    <ResponseField name="update_time" type="string">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="base_model" type="string">
+      The base model being tuned
+    </ResponseField>
+    
+    <ResponseField name="tuned_model" type="TunedModel">
+      Information about the tuned model (if completed)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage
+
+### List All Tuning Jobs
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Iterate through all tuning jobs
+for tuning_job in client.tunings.list():
+    print(f"Job: {tuning_job.name}")
+    print(f"State: {tuning_job.state}")
+    print(f"Created: {tuning_job.create_time}")
+    print("---")
+```
+
+### With Pagination Control
+
+```python
+from google.genai import types
+
+# Get first page with 10 jobs
+config = types.ListTuningJobsConfig(page_size=10)
+pager = client.tunings.list(config=config)
+
+# Process first page
+first_page = list(pager)
+print(f"First page has {len(first_page)} jobs")
+
+# Get next page if available
+if pager.next_page_token:
+    config.page_token = pager.next_page_token
+    next_pager = client.tunings.list(config=config)
+    next_page = list(next_pager)
+    print(f"Next page has {len(next_page)} jobs")
+```
+
+### Filter by State (Vertex AI)
+
+```python
+from google.genai import types
+
+# List only successful tuning jobs
+config = types.ListTuningJobsConfig(
+    filter='state=JOB_STATE_SUCCEEDED'
+)
+
+for tuning_job in client.tunings.list(config=config):
+    print(f"Completed job: {tuning_job.name}")
+    print(f"Model: {tuning_job.tuned_model.model}")
+```
+
+### Find Recent Jobs
+
+```python
+from datetime import datetime, timedelta
+from google.genai import types
+
+# Get jobs from the last 7 days
+week_ago = datetime.now() - timedelta(days=7)
+
+recent_jobs = []
+for tuning_job in client.tunings.list():
+    job_time = datetime.fromisoformat(tuning_job.create_time.replace('Z', '+00:00'))
+    if job_time > week_ago:
+        recent_jobs.append(tuning_job)
+
+print(f"Found {len(recent_jobs)} jobs in the last week")
+```
+
+### Monitor Running Jobs
+
+```python
+from google.genai import types
+
+# Find all running or pending jobs
+running_states = [
+    types.JobState.JOB_STATE_RUNNING,
+    types.JobState.JOB_STATE_PENDING,
+    types.JobState.JOB_STATE_QUEUED
+]
+
+running_jobs = []
+for tuning_job in client.tunings.list():
+    if tuning_job.state in running_states:
+        running_jobs.append(tuning_job)
+        print(f"Active job: {tuning_job.name}")
+        print(f"State: {tuning_job.state}")
+        print(f"Started: {tuning_job.start_time}")
+        print("---")
+
+print(f"\nTotal active jobs: {len(running_jobs)}")
+```
+
+### Export Job List
+
+```python
+import json
+
+# Collect all tuning jobs
+jobs_data = []
+for tuning_job in client.tunings.list():
+    jobs_data.append({
+        'name': tuning_job.name,
+        'state': tuning_job.state,
+        'base_model': tuning_job.base_model,
+        'create_time': tuning_job.create_time,
+        'tuned_model': tuning_job.tuned_model.model if tuning_job.tuned_model else None
+    })
+
+# Save to file
+with open('tuning_jobs.json', 'w') as f:
+    json.dump(jobs_data, f, indent=2)
+
+print(f"Exported {len(jobs_data)} tuning jobs")
+```
+
+## Notes
+
+- The pager automatically fetches additional pages as you iterate
+- Page size defaults vary between Gemini API and Vertex AI
+- Filtering is only supported on Vertex AI
+- Jobs are returned in reverse chronological order (newest first)
+
+## See Also
+
+- [tunings.get](/api/tunings/get) - Get details of a specific job
+- [tunings.tune](/api/tunings/tune) - Create a new tuning job
+- [tunings.cancel](/api/tunings/cancel) - Cancel a running job

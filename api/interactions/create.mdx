@@ -1,0 +1,345 @@
+---
+title: 'interactions.create'
+description: 'Create a new interaction (Beta)'
+---
+
+<Note>
+  The Interactions API is currently in Beta. Features and API signatures may change.
+</Note>
+
+## Method
+
+```python
+client.interactions.create(
+    input: Input,
+    model: str,
+    stream: bool = False,
+    background: bool = False,
+    generation_config: Optional[GenerationConfig] = None,
+    system_instruction: Optional[str] = None,
+    tools: Optional[list[Tool]] = None,
+    store: bool = False,
+    previous_interaction_id: Optional[str] = None,
+    response_format: Optional[object] = None,
+    response_mime_type: Optional[str] = None,
+    response_modalities: Optional[list[str]] = None
+) -> Interaction | Stream[InteractionSSEEvent]
+```
+
+Creates a new interaction with a model, optionally streaming the response. Interactions can be stored for later retrieval and can reference previous interactions for context.
+
+<ParamField path="input" type="Input" required>
+  The inputs for the interaction. Can be:
+  - A string message
+  - A list of content parts (text, images, etc.)
+  - Structured input object
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The name of the model to use. Example: `gemini-2.0-flash-exp`
+</ParamField>
+
+<ParamField path="stream" type="boolean" default="false">
+  Whether to stream the response incrementally. When `true`, returns a `Stream[InteractionSSEEvent]` instead of `Interaction`.
+</ParamField>
+
+<ParamField path="background" type="boolean" default="false">
+  Whether to run the interaction in the background. Background interactions can be retrieved later using the interaction ID.
+</ParamField>
+
+<ParamField path="generation_config" type="GenerationConfig">
+  Configuration parameters for the model:
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="temperature" type="float">
+      Controls randomness (0.0 to 2.0)
+    </ParamField>
+    
+    <ParamField path="top_p" type="float">
+      Nucleus sampling parameter
+    </ParamField>
+    
+    <ParamField path="top_k" type="int">
+      Top-k sampling parameter
+    </ParamField>
+    
+    <ParamField path="max_output_tokens" type="int">
+      Maximum number of tokens to generate
+    </ParamField>
+    
+    <ParamField path="stop_sequences" type="list[string]">
+      Sequences that stop generation
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="system_instruction" type="string">
+  System instruction to guide the model's behavior
+</ParamField>
+
+<ParamField path="tools" type="list[Tool]">
+  A list of tool declarations the model may call during interaction
+</ParamField>
+
+<ParamField path="store" type="boolean" default="false">
+  Whether to store the interaction for later retrieval. Stored interactions can be accessed using their ID.
+</ParamField>
+
+<ParamField path="previous_interaction_id" type="string">
+  The ID of a previous interaction to provide context
+</ParamField>
+
+<ParamField path="response_format" type="object">
+  JSON schema for structured output
+</ParamField>
+
+<ParamField path="response_mime_type" type="string">
+  MIME type for the response (e.g., `application/json`)
+</ParamField>
+
+<ParamField path="response_modalities" type="list[string]">
+  Requested modalities: `text`, `image`, or `audio`
+</ParamField>
+
+## Response
+
+### Non-Streaming Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the interaction
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The model used for the interaction
+</ResponseField>
+
+<ResponseField name="input" type="Input">
+  The input provided (if `include_input` was true)
+</ResponseField>
+
+<ResponseField name="output" type="Output">
+  The generated output from the model
+  
+  <Expandable title="Output Fields">
+    <ResponseField name="text" type="string">
+      Text content of the response
+    </ResponseField>
+    
+    <ResponseField name="parts" type="list">
+      List of content parts (text, images, etc.)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="state" type="string">
+  State of the interaction: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
+</ResponseField>
+
+<ResponseField name="create_time" type="string">
+  Timestamp when the interaction was created
+</ResponseField>
+
+<ResponseField name="usage_metadata" type="object">
+  Token usage information
+</ResponseField>
+
+### Streaming Response
+
+When `stream=True`, returns a `Stream[InteractionSSEEvent]` with incremental updates.
+
+## Usage
+
+### Basic Interaction
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Create a simple interaction
+interaction = client.interactions.create(
+    input='What is the capital of France?',
+    model='gemini-2.0-flash-exp'
+)
+
+print(f"Interaction ID: {interaction.id}")
+print(f"Response: {interaction.output.text}")
+```
+
+### Streaming Interaction
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Stream the response
+stream = client.interactions.create(
+    input='Write a short story about a robot',
+    model='gemini-2.0-flash-exp',
+    stream=True
+)
+
+for event in stream:
+    if event.output:
+        print(event.output.text, end='', flush=True)
+
+print()  # New line after streaming completes
+```
+
+### Background Interaction with Polling
+
+```python
+import time
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Start a background interaction
+interaction = client.interactions.create(
+    input='Analyze this large dataset...',
+    model='gemini-2.0-flash-exp',
+    background=True,
+    store=True
+)
+
+print(f"Started background interaction: {interaction.id}")
+
+# Poll for completion
+while interaction.state in ['PENDING', 'RUNNING']:
+    print(f"Status: {interaction.state}")
+    time.sleep(5)
+    interaction = client.interactions.get(id=interaction.id)
+
+if interaction.state == 'COMPLETED':
+    print(f"Result: {interaction.output.text}")
+else:
+    print(f"Failed with state: {interaction.state}")
+```
+
+### With Previous Context
+
+```python
+# First interaction
+interaction1 = client.interactions.create(
+    input='My name is Alice',
+    model='gemini-2.0-flash-exp',
+    store=True
+)
+
+print(f"First interaction: {interaction1.id}")
+
+# Second interaction referencing the first
+interaction2 = client.interactions.create(
+    input='What is my name?',
+    model='gemini-2.0-flash-exp',
+    previous_interaction_id=interaction1.id
+)
+
+print(f"Response: {interaction2.output.text}")  # Should mention Alice
+```
+
+### With Generation Config
+
+```python
+from google.genai import types
+
+interaction = client.interactions.create(
+    input='Generate creative product names',
+    model='gemini-2.0-flash-exp',
+    generation_config=types.GenerationConfig(
+        temperature=1.5,
+        top_p=0.95,
+        max_output_tokens=500,
+        stop_sequences=['END']
+    )
+)
+
+print(interaction.output.text)
+```
+
+### With Tools
+
+```python
+from google.genai import types
+
+# Define a tool
+get_weather = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name='get_weather',
+            description='Get the weather for a location',
+            parameters={
+                'type': 'object',
+                'properties': {
+                    'location': {'type': 'string'}
+                },
+                'required': ['location']
+            }
+        )
+    ]
+)
+
+interaction = client.interactions.create(
+    input='What is the weather in Paris?',
+    model='gemini-2.0-flash-exp',
+    tools=[get_weather]
+)
+
+print(f"Response: {interaction.output}")
+```
+
+### Structured Output
+
+```python
+import json
+
+schema = {
+    'type': 'object',
+    'properties': {
+        'name': {'type': 'string'},
+        'age': {'type': 'integer'},
+        'email': {'type': 'string'}
+    },
+    'required': ['name', 'age']
+}
+
+interaction = client.interactions.create(
+    input='Extract person info: John Doe is 30 years old, email john@example.com',
+    model='gemini-2.0-flash-exp',
+    response_format=schema,
+    response_mime_type='application/json'
+)
+
+data = json.loads(interaction.output.text)
+print(f"Name: {data['name']}, Age: {data['age']}")
+```
+
+## Notes
+
+<Info>
+  - Interactions are currently Beta and available through the Gemini API
+  - Stored interactions can be retrieved using [interactions.get](/api/interactions/get)
+  - Background interactions are useful for long-running operations
+  - Streaming provides real-time incremental responses
+  - Previous interaction context helps maintain conversation history
+</Info>
+
+## Error Handling
+
+```python
+try:
+    interaction = client.interactions.create(
+        input='Hello',
+        model='gemini-2.0-flash-exp'
+    )
+    print(interaction.output.text)
+except ValueError as e:
+    print(f"Invalid input: {e}")
+except Exception as e:
+    print(f"Error creating interaction: {e}")
+```
+
+## See Also
+
+- [interactions.get](/api/interactions/get) - Retrieve interaction details

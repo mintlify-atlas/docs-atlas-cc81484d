@@ -1,0 +1,210 @@
+---
+title: Tuning
+description: Fine-tune models with Vertex AI, manage tuning jobs, and use tuned models
+---
+
+<Note>
+Model tuning is only supported in Vertex AI.
+</Note>
+
+Fine-tuning allows you to customize Gemini models on your own data for improved performance on specific tasks.
+
+## Create a tuning job
+
+Start a supervised fine-tuning job:
+
+```python
+from google.genai import types
+
+model = 'gemini-2.5-flash'
+training_dataset = types.TuningDataset(
+    # or gcs_uri=my_vertex_multimodal_dataset
+    gcs_uri='gs://your-gcs-bucket/your-tuning-data.jsonl',
+)
+
+tuning_job = client.tunings.tune(
+    base_model=model,
+    training_dataset=training_dataset,
+    config=types.CreateTuningJobConfig(
+        epoch_count=1, 
+        tuned_model_display_name='test_dataset_examples model'
+    ),
+)
+print(tuning_job)
+```
+
+## Training data format
+
+Vertex AI supports two training data sources:
+
+### GCS JSONL file
+
+Provide a path to a JSONL file in Google Cloud Storage:
+
+```python
+training_dataset = types.TuningDataset(
+    gcs_uri='gs://your-gcs-bucket/training-data.jsonl',
+)
+```
+
+Each line should be a JSON object with the training example:
+
+```json
+{"contents": [{"role": "user", "parts": [{"text": "What is AI?"}]}, {"role": "model", "parts": [{"text": "AI is..."}]}]}
+{"contents": [{"role": "user", "parts": [{"text": "Explain ML"}]}, {"role": "model", "parts": [{"text": "ML is..."}]}]}
+```
+
+### Vertex AI Multimodal Dataset
+
+Use a [Vertex AI Multimodal Dataset](https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/datasets):
+
+```python
+training_dataset = types.TuningDataset(
+    gcs_uri='projects/PROJECT_ID/locations/LOCATION/datasets/DATASET_ID',
+)
+```
+
+## Get tuning job status
+
+Retrieve the status of a tuning job:
+
+```python
+tuning_job = client.tunings.get(name=tuning_job.name)
+print(tuning_job)
+print(tuning_job.state)
+```
+
+## Poll for completion
+
+Wait for a tuning job to complete:
+
+```python
+import time
+
+completed_states = set([
+    'JOB_STATE_SUCCEEDED',
+    'JOB_STATE_FAILED',
+    'JOB_STATE_CANCELLED',
+])
+
+while tuning_job.state not in completed_states:
+    print(tuning_job.state)
+    tuning_job = client.tunings.get(name=tuning_job.name)
+    time.sleep(10)
+
+if tuning_job.state == 'JOB_STATE_SUCCEEDED':
+    print("Tuning completed successfully!")
+else:
+    print(f"Tuning ended with state: {tuning_job.state}")
+```
+
+## Use tuned models
+
+Once tuning is complete, use the tuned model endpoint:
+
+```python
+response = client.models.generate_content(
+    model=tuning_job.tuned_model.endpoint,
+    contents='why is the sky blue?',
+)
+
+print(response.text)
+```
+
+## Get tuned model details
+
+Retrieve information about a tuned model:
+
+```python
+tuned_model = client.models.get(model=tuning_job.tuned_model.model)
+print(tuned_model)
+```
+
+## List tuned models
+
+List all your tuned models:
+
+```python
+for model in client.models.list(config={'page_size': 10, 'query_base': False}):
+    print(model)
+```
+
+### Pagination
+
+Navigate through pages of tuned models:
+
+```python
+pager = client.models.list(config={'page_size': 10, 'query_base': False})
+print(pager.page_size)
+print(pager[0])
+pager.next_page()
+print(pager[0])
+```
+
+### Async listing
+
+```python
+async for job in await client.aio.models.list(
+    config={'page_size': 10, 'query_base': False}
+):
+    print(job)
+```
+
+With pagination:
+
+```python
+async_pager = await client.aio.models.list(
+    config={'page_size': 10, 'query_base': False}
+)
+print(async_pager.page_size)
+print(async_pager[0])
+await async_pager.next_page()
+print(async_pager[0])
+```
+
+## Update tuned models
+
+Update display name and description:
+
+```python
+from google.genai import types
+
+model = pager[0]
+
+model = client.models.update(
+    model=model.name,
+    config=types.UpdateModelConfig(
+        display_name='my tuned model', 
+        description='my tuned model description'
+    ),
+)
+
+print(model)
+```
+
+## List tuning jobs
+
+List all tuning jobs:
+
+```python
+for job in client.tunings.list(config={'page_size': 10}):
+    print(job)
+```
+
+## Tuning configuration
+
+The `CreateTuningJobConfig` supports:
+
+- **epoch_count** - Number of training epochs
+- **tuned_model_display_name** - Display name for the tuned model
+- **learning_rate** - Learning rate for training
+- **batch_size** - Training batch size
+
+## Best practices
+
+- Use at least 100-500 high-quality training examples
+- Format your data consistently
+- Monitor the tuning job state regularly
+- Test your tuned model before deploying to production
+- Keep your training data in GCS for easy access
+- Use validation data to prevent overfitting

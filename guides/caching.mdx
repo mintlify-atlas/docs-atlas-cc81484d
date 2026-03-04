@@ -1,0 +1,306 @@
+---
+title: Context Caching
+description: Cache long prompts and content to improve performance and reduce costs
+---
+
+Context caching allows you to save frequently used content (like large documents, files, or system instructions) and reuse them across multiple requests. This improves response times and reduces token usage for repeated content.
+
+## Benefits
+
+- **Faster responses**: Cached content doesn't need to be reprocessed
+- **Lower costs**: You're not charged for cached tokens in subsequent requests
+- **Better performance**: Ideal for long documents, knowledge bases, and system instructions
+
+## Creating Cached Content
+
+Create a cache with content you want to reuse:
+
+```python
+from google.genai import types
+
+if client.vertexai:
+    file_uris = [
+        'gs://cloud-samples-data/generative-ai/pdf/2312.11805v3.pdf',
+        'gs://cloud-samples-data/generative-ai/pdf/2403.05530.pdf',
+    ]
+else:
+    file_uris = [file1.uri, file2.uri]
+
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=types.CreateCachedContentConfig(
+        contents=[
+            types.Content(
+                role='user',
+                parts=[
+                    types.Part.from_uri(
+                        file_uri=file_uris[0], mime_type='application/pdf'
+                    ),
+                    types.Part.from_uri(
+                        file_uri=file_uris[1],
+                        mime_type='application/pdf',
+                    ),
+                ],
+            )
+        ],
+        system_instruction='What is the sum of the two pdfs?',
+        display_name='test cache',
+        ttl='3600s',
+    ),
+)
+```
+
+## Cache Configuration
+
+When creating a cache, you can specify:
+
+- **contents**: The content to cache (documents, files, text, etc.)
+- **system_instruction**: Optional system instructions included in the cache
+- **display_name**: A human-readable name for the cache
+- **ttl**: Time-to-live for the cache (e.g., '3600s' for 1 hour)
+
+## Time-to-Live (TTL)
+
+The TTL determines how long the cache remains available:
+
+- Format: String with time unit (e.g., '3600s', '60m', '1h', '1d')
+- Minimum: 60 seconds
+- Maximum: 7 days
+- After expiration: The cache is automatically deleted
+
+```python
+from google.genai import types
+
+# Cache for 1 hour
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=types.CreateCachedContentConfig(
+        contents=[...],
+        ttl='3600s',  # 1 hour
+    ),
+)
+
+# Cache for 1 day
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=types.CreateCachedContentConfig(
+        contents=[...],
+        ttl='86400s',  # 24 hours
+    ),
+)
+```
+
+## Retrieving Cached Content
+
+Get a cached content object by its name:
+
+```python
+cached_content = client.caches.get(name=cached_content.name)
+```
+
+## Using Cached Content
+
+Reference the cached content in your generate content requests:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Summarize the pdfs',
+    config=types.GenerateContentConfig(
+        cached_content=cached_content.name,
+    ),
+)
+print(response.text)
+```
+
+The model will use the cached content as context without reprocessing it.
+
+## Multiple Requests with Same Cache
+
+You can reuse the same cached content across multiple requests:
+
+```python
+from google.genai import types
+
+# First request
+response1 = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='What are the main topics in the pdfs?',
+    config=types.GenerateContentConfig(
+        cached_content=cached_content.name,
+    ),
+)
+
+# Second request with different question
+response2 = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='List the key findings from the pdfs',
+    config=types.GenerateContentConfig(
+        cached_content=cached_content.name,
+    ),
+)
+
+# Third request
+response3 = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Compare the methodologies in both pdfs',
+    config=types.GenerateContentConfig(
+        cached_content=cached_content.name,
+    ),
+)
+```
+
+Each request benefits from the cached content without reprocessing the PDFs.
+
+## Listing Caches
+
+View all your cached content:
+
+```python
+caches = client.caches.list()
+for cache in caches:
+    print(f"Name: {cache.name}")
+    print(f"Display name: {cache.display_name}")
+    print(f"Expires at: {cache.expire_time}")
+```
+
+## Updating Cache TTL
+
+Extend the lifetime of a cache:
+
+```python
+from google.genai import types
+
+updated_cache = client.caches.update(
+    name=cached_content.name,
+    config=types.UpdateCachedContentConfig(
+        ttl='7200s',  # Extend to 2 hours
+    ),
+)
+```
+
+## Deleting Cached Content
+
+Manually delete a cache before it expires:
+
+```python
+client.caches.delete(name=cached_content.name)
+```
+
+## Best Practices
+
+- **Cache large content**: Only cache content that's large enough to benefit from caching (typically > 10K tokens)
+- **Set appropriate TTL**: Balance between cache availability and cost
+- **Reuse caches**: Use the same cache across multiple requests to maximize benefits
+- **Monitor expiration**: Track cache expiration times and recreate as needed
+- **Cache stable content**: Best for content that doesn't change frequently
+
+## Common Use Cases
+
+### Long Documents
+
+Cache large documents for Q&A:
+
+```python
+from google.genai import types
+
+# Create cache with document
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=types.CreateCachedContentConfig(
+        contents=[
+            types.Content(
+                role='user',
+                parts=[types.Part.from_uri(
+                    file_uri='gs://path/to/large-document.pdf',
+                    mime_type='application/pdf'
+                )],
+            )
+        ],
+        display_name='Product documentation',
+        ttl='86400s',  # Cache for 24 hours
+    ),
+)
+
+# Ask multiple questions
+for question in questions:
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents=question,
+        config=types.GenerateContentConfig(
+            cached_content=cached_content.name,
+        ),
+    )
+    print(response.text)
+```
+
+### System Instructions
+
+Cache system instructions for consistent behavior:
+
+```python
+from google.genai import types
+
+# Cache system instructions
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=types.CreateCachedContentConfig(
+        contents=[],
+        system_instruction='You are a helpful coding assistant that follows best practices...',
+        display_name='Coding assistant persona',
+        ttl='86400s',
+    ),
+)
+
+# Use for multiple conversations
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='How do I write a Python decorator?',
+    config=types.GenerateContentConfig(
+        cached_content=cached_content.name,
+    ),
+)
+```
+
+### Knowledge Base
+
+Cache multiple documents as a knowledge base:
+
+```python
+from google.genai import types
+
+# Cache multiple documents
+cached_content = client.caches.create(
+    model='gemini-2.5-flash',
+    config=types.CreateCachedContentConfig(
+        contents=[
+            types.Content(
+                role='user',
+                parts=[
+                    types.Part.from_uri(
+                        file_uri=uri,
+                        mime_type='application/pdf'
+                    )
+                    for uri in document_uris
+                ],
+            )
+        ],
+        display_name='Company knowledge base',
+        ttl='604800s',  # 7 days
+    ),
+)
+```
+
+## Cost Optimization
+
+Caching reduces costs significantly for repeated content:
+
+- **First request**: Normal token pricing for cached content
+- **Subsequent requests**: Discounted pricing for cached tokens
+- **Threshold**: Caching is cost-effective when content is reused 2+ times
+
+<Note>
+Cache tokens are counted separately from prompt and output tokens. Cached content typically costs much less than regular prompt tokens.
+</Note>

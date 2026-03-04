@@ -1,0 +1,383 @@
+---
+title: System Instructions & Configuration
+description: Learn how to configure model behavior using system instructions, temperature, max_output_tokens, and other parameters in the Google Gen AI Python SDK.
+---
+
+The behavior and output of Gemini models can be customized through various configuration parameters. This guide covers the most important settings.
+
+## System Instructions
+
+System instructions set the context and behavior for the model throughout the conversation:
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key='your-api-key')
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='high',
+    config=types.GenerateContentConfig(
+        system_instruction='I say high, you say low',
+    ),
+)
+print(response.text)  # Output: low
+```
+
+<Note>
+System instructions are like a primer that influences all subsequent responses. They persist throughout the conversation.
+</Note>
+
+### Complex System Instructions
+
+You can provide detailed behavioral instructions:
+
+```python
+from google.genai import types
+
+system_instruction = """You are a helpful assistant specialized in Python programming.
+Follow these guidelines:
+- Provide clear, concise code examples
+- Explain complex concepts in simple terms
+- Always include error handling in code snippets
+- Suggest best practices and optimization tips
+"""
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='How do I read a file in Python?',
+    config=types.GenerateContentConfig(
+        system_instruction=system_instruction,
+    ),
+)
+print(response.text)
+```
+
+## Temperature
+
+Controls randomness in the output. Lower values make the model more deterministic:
+
+<Tabs>
+  <Tab title="Low Temperature (0.0-0.3)">
+    More deterministic and focused:
+
+    ```python
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents='What is 2+2?',
+        config=types.GenerateContentConfig(
+            temperature=0.0,
+        ),
+    )
+    print(response.text)  # Consistently: "4" or "2+2 equals 4"
+    ```
+
+    **Use for:**
+    - Factual questions
+    - Code generation
+    - Structured data extraction
+    - Consistent outputs
+  </Tab>
+
+  <Tab title="Medium Temperature (0.4-0.7)">
+    Balanced between creativity and consistency:
+
+    ```python
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents='Explain quantum computing',
+        config=types.GenerateContentConfig(
+            temperature=0.5,
+        ),
+    )
+    print(response.text)
+    ```
+
+    **Use for:**
+    - General Q&A
+    - Explanations
+    - Summaries
+    - Default use cases
+  </Tab>
+
+  <Tab title="High Temperature (0.8-2.0)">
+    More creative and varied:
+
+    ```python
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents='Write a creative story about a robot',
+        config=types.GenerateContentConfig(
+            temperature=0.9,
+        ),
+    )
+    print(response.text)
+    ```
+
+    **Use for:**
+    - Creative writing
+    - Brainstorming
+    - Diverse outputs
+    - Poetry and storytelling
+  </Tab>
+</Tabs>
+
+## Max Output Tokens
+
+Limits the length of the generated response:
+
+```python
+from google.genai import types
+
+# Short response (3 tokens)
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='high',
+    config=types.GenerateContentConfig(
+        system_instruction='I say high, you say low',
+        max_output_tokens=3,
+        temperature=0.3,
+    ),
+)
+print(response.text)  # Output: "low" (within 3 tokens)
+```
+
+### Token Length Guidelines
+
+```python
+from google.genai import types
+
+# Short summary (100-200 tokens)
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Summarize the history of the internet',
+    config=types.GenerateContentConfig(
+        max_output_tokens=200,
+    ),
+)
+
+# Medium content (500-1000 tokens)
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Write a blog post about AI',
+    config=types.GenerateContentConfig(
+        max_output_tokens=1000,
+    ),
+)
+
+# Long-form content (2000+ tokens)
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Write a detailed technical guide',
+    config=types.GenerateContentConfig(
+        max_output_tokens=2048,
+    ),
+)
+```
+
+<Warning>
+Different models have different maximum token limits. Check the [model documentation](https://ai.google.dev/gemini-api/docs/models) for specific limits.
+</Warning>
+
+## Combining Configuration Parameters
+
+All parameters work together to shape the output:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Write a Python function to calculate fibonacci numbers',
+    config=types.GenerateContentConfig(
+        system_instruction="""You are an expert Python developer.
+        Write clean, efficient, well-documented code.
+        Include docstrings and type hints.""",
+        temperature=0.2,  # Low for consistent code
+        max_output_tokens=500,
+        top_p=0.95,
+        top_k=40,
+    ),
+)
+print(response.text)
+```
+
+## Top-p (Nucleus Sampling)
+
+Controls diversity by considering tokens with cumulative probability:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Generate creative product names',
+    config=types.GenerateContentConfig(
+        temperature=0.8,
+        top_p=0.9,  # Consider top 90% probability mass
+    ),
+)
+print(response.text)
+```
+
+- `top_p=1.0`: Consider all tokens (default)
+- `top_p=0.9`: Consider only top 90% probability tokens
+- `top_p=0.5`: More focused, less diverse
+
+## Top-k Sampling
+
+Limits the number of tokens considered:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='Suggest product names',
+    config=types.GenerateContentConfig(
+        temperature=0.8,
+        top_k=40,  # Consider only top 40 tokens
+    ),
+)
+print(response.text)
+```
+
+## Stop Sequences
+
+Define sequences where generation should stop:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='List three colors: ',
+    config=types.GenerateContentConfig(
+        stop_sequences=['4.', '\n\n'],  # Stop at "4." or double newline
+        max_output_tokens=100,
+    ),
+)
+print(response.text)  # Will stop after listing 3 colors
+```
+
+## Configuration with Chat
+
+System instructions and config apply to entire chat sessions:
+
+```python
+from google.genai import types
+
+chat = client.chats.create(
+    model='gemini-2.5-flash',
+    config=types.GenerateContentConfig(
+        system_instruction="""You are a helpful tutor teaching Python.
+        Always provide examples with explanations.""",
+        temperature=0.4,
+    ),
+)
+
+response1 = chat.send_message('What are lists?')
+print(response1.text)
+
+response2 = chat.send_message('Show me an example')
+print(response2.text)
+```
+
+## Model-Specific Parameters
+
+Check capabilities and defaults for each model:
+
+- **Gemini 2.5 Flash**: Fast, efficient, good for most tasks
+- **Gemini 2.5 Pro**: Advanced reasoning, complex tasks
+
+See the [Vertex AI docs](https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash) and [Gemini API docs](https://ai.google.dev/gemini-api/docs/models) for model-specific parameters.
+
+## Configuration Presets
+
+Common configuration patterns:
+
+<Tabs>
+  <Tab title="Factual Q&A">
+    ```python
+    from google.genai import types
+
+    config = types.GenerateContentConfig(
+        temperature=0.1,
+        top_p=0.95,
+        max_output_tokens=500,
+    )
+    ```
+  </Tab>
+
+  <Tab title="Creative Writing">
+    ```python
+    from google.genai import types
+
+    config = types.GenerateContentConfig(
+        temperature=0.9,
+        top_p=0.95,
+        max_output_tokens=2048,
+    )
+    ```
+  </Tab>
+
+  <Tab title="Code Generation">
+    ```python
+    from google.genai import types
+
+    config = types.GenerateContentConfig(
+        system_instruction="Write clean, well-documented code.",
+        temperature=0.2,
+        max_output_tokens=1000,
+    )
+    ```
+  </Tab>
+
+  <Tab title="Summarization">
+    ```python
+    from google.genai import types
+
+    config = types.GenerateContentConfig(
+        system_instruction="Provide concise summaries.",
+        temperature=0.3,
+        max_output_tokens=300,
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Chatbots" icon="comments">
+    System instructions for personality, temperature for variety
+  </Card>
+  <Card title="Code Generation" icon="code">
+    Low temperature, specific system instructions
+  </Card>
+  <Card title="Content Creation" icon="pen-fancy">
+    High temperature, flexible max_output_tokens
+  </Card>
+  <Card title="Data Extraction" icon="database">
+    Low temperature, stop sequences, structured output
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+- Start with default settings and adjust based on output quality
+- Use low temperature (0.0-0.3) for factual, consistent outputs
+- Use high temperature (0.7-1.0) for creative, varied outputs
+- Set `max_output_tokens` to prevent excessively long responses
+- Use system instructions to establish consistent behavior
+- Combine `top_p` and `top_k` for fine-grained control
+- Test different configurations to find optimal settings
+- Use stop sequences to control output format
+- Document your configuration choices for reproducibility

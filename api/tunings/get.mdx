@@ -1,0 +1,178 @@
+---
+title: 'tunings.get'
+description: 'Retrieve information about a tuning job'
+---
+
+## Method
+
+```python
+client.tunings.get(
+    name: str,
+    config: Optional[GetTuningJobConfig] = None
+) -> TuningJob
+```
+
+Retrieves detailed information about a specific tuning job by its resource name.
+
+<ParamField path="name" type="string" required>
+  The resource name of the tuning job. Format:
+  - Vertex AI: `projects/{project}/locations/{location}/tuningJobs/{job_id}`
+  - Gemini API: `tunedModels/{model_id}`
+</ParamField>
+
+<ParamField path="config" type="GetTuningJobConfig">
+  Optional configuration for the request
+  
+  <Expandable title="Configuration Fields">
+    <ParamField path="http_options" type="HttpOptions">
+      Custom HTTP options for the request
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="name" type="string">
+  The resource name of the tuning job
+</ResponseField>
+
+<ResponseField name="state" type="JobState">
+  Current state of the tuning job:
+  - `JOB_STATE_QUEUED`
+  - `JOB_STATE_PENDING`
+  - `JOB_STATE_RUNNING`
+  - `JOB_STATE_SUCCEEDED`
+  - `JOB_STATE_FAILED`
+  - `JOB_STATE_CANCELLED`
+</ResponseField>
+
+<ResponseField name="create_time" type="string">
+  ISO 8601 timestamp when the job was created
+</ResponseField>
+
+<ResponseField name="start_time" type="string">
+  ISO 8601 timestamp when the job started
+</ResponseField>
+
+<ResponseField name="end_time" type="string">
+  ISO 8601 timestamp when the job completed
+</ResponseField>
+
+<ResponseField name="update_time" type="string">
+  ISO 8601 timestamp of the last update
+</ResponseField>
+
+<ResponseField name="base_model" type="string">
+  The base model that is being tuned
+</ResponseField>
+
+<ResponseField name="tuned_model" type="TunedModel">
+  Information about the resulting tuned model (available after completion)
+  
+  <Expandable title="TunedModel Fields">
+    <ResponseField name="model" type="string">
+      The resource name of the tuned model
+    </ResponseField>
+    
+    <ResponseField name="endpoint" type="string">
+      The endpoint to use for the tuned model
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error information if the job failed
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Description of the tuning job (Vertex AI only)
+</ResponseField>
+
+<ResponseField name="tuning_data_stats" type="object">
+  Statistics about the training data (Vertex AI only)
+</ResponseField>
+
+## Usage
+
+### Check Job Status
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Get tuning job details
+tuning_job = client.tunings.get(
+    name='projects/my-project/locations/us-central1/tuningJobs/123456'
+)
+
+print(f"Job: {tuning_job.name}")
+print(f"State: {tuning_job.state}")
+print(f"Created: {tuning_job.create_time}")
+
+if tuning_job.state == 'JOB_STATE_SUCCEEDED':
+    print(f"Tuned model: {tuning_job.tuned_model.model}")
+```
+
+### Monitor Job Progress
+
+```python
+import time
+from google.genai import types
+
+job_name = 'projects/my-project/locations/us-central1/tuningJobs/123456'
+
+while True:
+    tuning_job = client.tunings.get(name=job_name)
+    
+    print(f"Current state: {tuning_job.state}")
+    
+    # Check if job is complete
+    if tuning_job.state in [
+        types.JobState.JOB_STATE_SUCCEEDED,
+        types.JobState.JOB_STATE_FAILED,
+        types.JobState.JOB_STATE_CANCELLED
+    ]:
+        break
+    
+    # Wait before checking again
+    time.sleep(60)
+
+if tuning_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    print(f"Success! Tuned model: {tuning_job.tuned_model.model}")
+else:
+    print(f"Job ended with state: {tuning_job.state}")
+    if tuning_job.error:
+        print(f"Error: {tuning_job.error}")
+```
+
+### Handle Job Completion
+
+```python
+from google.genai import types
+
+tuning_job = client.tunings.get(name=job_name)
+
+# Check job status and take action
+if tuning_job.state == types.JobState.JOB_STATE_SUCCEEDED:
+    # Use the tuned model
+    model = tuning_job.tuned_model.model
+    response = client.models.generate_content(
+        model=model,
+        contents='Test the tuned model'
+    )
+    print(response.text)
+    
+elif tuning_job.state == types.JobState.JOB_STATE_FAILED:
+    print(f"Tuning failed: {tuning_job.error}")
+    
+elif tuning_job.state == types.JobState.JOB_STATE_RUNNING:
+    elapsed = tuning_job.update_time - tuning_job.start_time
+    print(f"Job still running, elapsed time: {elapsed}")
+```
+
+## See Also
+
+- [tunings.tune](/api/tunings/tune) - Create a new tuning job
+- [tunings.list](/api/tunings/list) - List all tuning jobs
+- [tunings.cancel](/api/tunings/cancel) - Cancel a running job

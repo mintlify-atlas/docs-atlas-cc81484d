@@ -1,0 +1,453 @@
+---
+title: "generate_videos"
+description: "Generate videos using Veo models"
+---
+
+## Method Signature
+
+```python
+def generate_videos(
+    self,
+    *,
+    model: str,
+    prompt: Optional[str] = None,
+    image: Optional[Image] = None,
+    video: Optional[Video] = None,
+    source: Optional[GenerateVideosSource] = None,
+    config: Optional[GenerateVideosConfig] = None,
+) -> GenerateVideosOperation
+```
+
+```python
+async def generate_videos(
+    self,
+    *,
+    model: str,
+    prompt: Optional[str] = None,
+    image: Optional[Image] = None,
+    video: Optional[Video] = None,
+    source: Optional[GenerateVideosSource] = None,
+    config: Optional[GenerateVideosConfig] = None,
+) -> GenerateVideosOperation
+```
+
+## Description
+
+Generates videos based on input (text, image, or video) using Veo models. This is a long-running operation that returns immediately with an operation object that can be polled for completion.
+
+Supported use cases:
+1. **Text to video** - Generate video from text prompt
+2. **Image to video** - Animate a static image (with optional text prompt)
+3. **Image to video with interpolation** - Generate video between two frames
+4. **Video extension** - Extend an existing video (with optional text prompt)
+
+## Parameters
+
+<ParamField path="model" type="str" required>
+  The Veo model to use for generation.
+  
+  Examples:
+  - `'veo-2.0-generate-001'`
+  - `'veo-001'`
+</ParamField>
+
+<ParamField path="source" type="GenerateVideosSource">
+  The input source for video generation (recommended).
+  
+  <Expandable title="source properties">
+    <ParamField path="prompt" type="str">
+      Text description for the video
+    </ParamField>
+    
+    <ParamField path="image" type="Image">
+      Input image to animate
+    </ParamField>
+    
+    <ParamField path="video" type="Video">
+      Input video to extend
+    </ParamField>
+  </Expandable>
+  
+  **Note:** Use `source` instead of the individual `prompt`, `image`, `video` parameters (which are deprecated).
+</ParamField>
+
+<ParamField path="prompt" type="str">
+  Text prompt for video generation. **Deprecated** - use `source.prompt` instead.
+</ParamField>
+
+<ParamField path="image" type="Image">
+  Input image for image-to-video. **Deprecated** - use `source.image` instead.
+</ParamField>
+
+<ParamField path="video" type="Video">
+  Input video for video extension. **Deprecated** - use `source.video` instead.
+</ParamField>
+
+<ParamField path="config" type="GenerateVideosConfig">
+  Configuration for video generation.
+  
+  <Expandable title="config properties">
+    <ParamField path="number_of_videos" type="int">
+      Number of videos to generate (default: 1)
+    </ParamField>
+    
+    <ParamField path="duration_seconds" type="float">
+      Duration of generated video in seconds.
+      
+      Examples: `5.0`, `8.0`, `10.0`
+    </ParamField>
+    
+    <ParamField path="aspect_ratio" type="str">
+      Aspect ratio of the video.
+      
+      Options:
+      - `'16:9'` - Landscape (default)
+      - `'9:16'` - Portrait
+      - `'1:1'` - Square
+    </ParamField>
+    
+    <ParamField path="resolution" type="str">
+      Video resolution.
+      
+      Options:
+      - `'720p'`
+      - `'1080p'`
+    </ParamField>
+    
+    <ParamField path="fps" type="int">
+      Frames per second.
+      
+      Examples: `24`, `30`
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="seed" type="int">
+      Random seed for reproducible generation.
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="negative_prompt" type="str">
+      Text describing what to avoid in the video.
+      
+      Example: `'shaky, blurry, low quality'`
+    </ParamField>
+    
+    <ParamField path="enhance_prompt" type="bool">
+      Automatically enhance the prompt for better results (default: false)
+    </ParamField>
+    
+    <ParamField path="person_generation" type="str">
+      Policy for generating videos with people.
+      
+      Options:
+      - `'DONT_ALLOW'`
+      - `'ALLOW_ADULT'`
+    </ParamField>
+    
+    <ParamField path="last_frame" type="Image">
+      End frame for frame interpolation (image-to-video mode).
+      
+      When provided with a start image, generates video interpolating between the two frames.
+    </ParamField>
+    
+    <ParamField path="reference_images" type="list[VideoGenerationReferenceImage]">
+      Reference images for style or subject consistency.
+    </ParamField>
+    
+    <ParamField path="mask" type="VideoGenerationMask">
+      Mask for selective video generation/editing.
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="generate_audio" type="bool">
+      Generate audio for the video (default: false)
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="output_gcs_uri" type="str">
+      Google Cloud Storage URI to save generated videos.
+      
+      Example: `'gs://my-bucket/videos/'`
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="compression_quality" type="int">
+      Video compression quality (0-100)
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="pubsub_topic" type="str">
+      Pub/Sub topic for completion notifications.
+      
+      Example: `'projects/my-project/topics/video-complete'`
+      
+      *Vertex AI only*
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns a `GenerateVideosOperation` object for long-running operation tracking.
+
+<ResponseField name="name" type="str">
+  The operation name/ID for polling
+</ResponseField>
+
+<ResponseField name="done" type="bool">
+  Whether the operation is complete
+</ResponseField>
+
+<ResponseField name="metadata" type="dict">
+  Operation metadata including progress information
+</ResponseField>
+
+<ResponseField name="error" type="dict">
+  Error information if the operation failed
+</ResponseField>
+
+<ResponseField name="result" type="GenerateVideosResponse">
+  The result when operation completes successfully.
+  
+  <Expandable title="GenerateVideosResponse properties">
+    <ResponseField name="generated_videos" type="list[GeneratedVideo]">
+      List of generated videos.
+      
+      <Expandable title="GeneratedVideo properties">
+        <ResponseField name="video" type="Video">
+          The generated video object with:
+          - `.uri` - GCS URI or data URI
+          - `.video_bytes` - Raw video bytes
+          - `.mime_type` - Video MIME type
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="rai_media_filtered_count" type="int">
+      Number of videos filtered by Responsible AI systems
+    </ResponseField>
+    
+    <ResponseField name="rai_media_filtered_reasons" type="list[str]">
+      Reasons videos were filtered
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Code Examples
+
+### Text to Video Generation
+
+```python
+import time
+from google import genai
+from google.genai import types
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+# Start video generation
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        prompt='A neon hologram of a cat driving at top speed',
+    ),
+)
+
+print(f"Operation started: {operation.name}")
+
+# Poll until complete
+while not operation.done:
+    time.sleep(10)
+    operation = client.operations.get(operation.name)
+    print(f"Status: {'Done' if operation.done else 'In progress...'}")
+
+# Access the result
+if operation.result:
+    video_uri = operation.result.generated_videos[0].video.uri
+    print(f"Video generated: {video_uri}")
+else:
+    print(f"Error: {operation.error}")
+```
+
+### Image to Video with Configuration
+
+```python
+from google.genai import types
+
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        image=types.Image.from_file('input.jpg'),
+        prompt='The scene comes to life with gentle movement',
+    ),
+    config=types.GenerateVideosConfig(
+        duration_seconds=8.0,
+        aspect_ratio='16:9',
+        resolution='1080p',
+        fps=30,
+    )
+)
+
+print(f"Operation: {operation.name}")
+```
+
+### Frame Interpolation (Image to Video)
+
+```python
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        image=types.Image.from_file('start_frame.jpg'),
+    ),
+    config=types.GenerateVideosConfig(
+        last_frame=types.Image.from_file('end_frame.jpg'),
+        duration_seconds=5.0,
+    )
+)
+
+# The model generates smooth transitions between the two frames
+```
+
+### Video Extension
+
+```python
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        video=types.Video.from_uri('gs://my-bucket/input.mp4', 'video/mp4'),
+        prompt='Continue the scene with the character walking forward',
+    ),
+    config=types.GenerateVideosConfig(
+        duration_seconds=5.0,
+    )
+)
+```
+
+### With Negative Prompt and Safety Controls
+
+```python
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        prompt='A person dancing in a vibrant city',
+    ),
+    config=types.GenerateVideosConfig(
+        negative_prompt='shaky camera, blurry, distorted, low quality',
+        person_generation='ALLOW_ADULT',
+        duration_seconds=8.0,
+        enhance_prompt=True,
+    )
+)
+```
+
+### Save to Cloud Storage with Audio
+
+```python
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        prompt='A waterfall in a lush forest',
+    ),
+    config=types.GenerateVideosConfig(
+        duration_seconds=8.0,
+        generate_audio=True,
+        output_gcs_uri='gs://my-bucket/videos/',
+        compression_quality=90,
+    )
+)
+```
+
+### With Pub/Sub Notification
+
+```python
+operation = client.models.generate_videos(
+    model='veo-2.0-generate-001',
+    source=types.GenerateVideosSource(
+        prompt='A futuristic spaceship flying through space',
+    ),
+    config=types.GenerateVideosConfig(
+        pubsub_topic='projects/my-project/topics/video-complete',
+        output_gcs_uri='gs://my-bucket/videos/',
+    )
+)
+
+print(f"Operation {operation.name} will notify {config.pubsub_topic} when done")
+```
+
+### Async Usage
+
+```python
+import asyncio
+from google import genai
+from google.genai import types
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+async def generate():
+    operation = await client.aio.models.generate_videos(
+        model='veo-2.0-generate-001',
+        source=types.GenerateVideosSource(
+            prompt='A robot exploring an alien planet',
+        ),
+    )
+    
+    print(f"Operation started: {operation.name}")
+    
+    # Poll until complete
+    while not operation.done:
+        await asyncio.sleep(10)
+        operation = await client.aio.operations.get(operation.name)
+    
+    if operation.result:
+        print(f"Video: {operation.result.generated_videos[0].video.uri}")
+
+asyncio.run(generate())
+```
+
+## Operation Polling
+
+Video generation is a long-running operation. You must poll the operation to check completion:
+
+```python
+import time
+
+def wait_for_operation(client, operation):
+    """Poll operation until complete."""
+    while not operation.done:
+        time.sleep(10)
+        operation = client.operations.get(operation.name)
+        
+        if operation.metadata:
+            progress = operation.metadata.get('progress', 0)
+            print(f"Progress: {progress}%")
+    
+    if operation.error:
+        raise Exception(f"Operation failed: {operation.error}")
+    
+    return operation.result
+
+# Use it
+operation = client.models.generate_videos(...)
+result = wait_for_operation(client, operation)
+print(f"Video: {result.generated_videos[0].video.uri}")
+```
+
+## Notes
+
+- Video generation typically takes 3-10 minutes depending on duration and settings
+- Use `source` parameter instead of deprecated `prompt`, `image`, `video` parameters
+- The operation returns immediately; you must poll for completion
+- Use Pub/Sub notifications for production systems instead of polling
+- Some configuration options are only available on Vertex AI
+- Videos may be filtered by Responsible AI systems
+- Higher resolution and longer duration increase generation time
+- The `enhance_prompt` feature can improve results but may alter your intent
+
+## Related Methods
+
+- [generate_images](/api/models/generate-images) - Generate images with Imagen

@@ -1,0 +1,115 @@
+---
+title: Imagen
+description: Generate, upscale, and edit images using Imagen models
+---
+
+Imagen models enable you to generate, upscale, and edit images using the Google Gen AI Python SDK.
+
+## Generate images
+
+Generate images from text prompts using the `generate_images` method:
+
+```python
+from google.genai import types
+
+response = client.models.generate_images(
+    model='imagen-4.0-generate-001',
+    prompt='An umbrella in the foreground, and a rainy night sky in the background',
+    config=types.GenerateImagesConfig(
+        number_of_images=1,
+        include_rai_reason=True,
+        output_mime_type='image/jpeg',
+    ),
+)
+response.generated_images[0].image.show()
+```
+
+### Configuration options
+
+The `GenerateImagesConfig` supports the following parameters:
+
+- **number_of_images** - Number of images to generate (default: 1)
+- **include_rai_reason** - Include Responsible AI filtering reasons
+- **output_mime_type** - Output format: `image/jpeg` or `image/png`
+
+## Upscale images
+
+<Note>
+Image upscaling is only supported in Vertex AI.
+</Note>
+
+Upscale existing images to higher resolutions:
+
+```python
+from google.genai import types
+
+response = client.models.upscale_image(
+    model='imagen-4.0-upscale-preview',
+    image=response.generated_images[0].image,
+    upscale_factor='x2',
+    config=types.UpscaleImageConfig(
+        include_rai_reason=True,
+        output_mime_type='image/jpeg',
+    ),
+)
+response.generated_images[0].image.show()
+```
+
+The `upscale_factor` parameter accepts `'x2'` or `'x4'` for 2x or 4x upscaling.
+
+## Edit images
+
+<Note>
+Image editing is only supported in Vertex AI and uses a separate model (`imagen-3.0-capability-001`).
+</Note>
+
+Edit images using inpainting and masking techniques:
+
+```python
+from google.genai import types
+from google.genai.types import RawReferenceImage, MaskReferenceImage
+
+# Define the reference image
+raw_ref_image = RawReferenceImage(
+    reference_id=1,
+    reference_image=response.generated_images[0].image,
+)
+
+# Define the mask (model computes a mask of the background)
+mask_ref_image = MaskReferenceImage(
+    reference_id=2,
+    config=types.MaskReferenceConfig(
+        mask_mode='MASK_MODE_BACKGROUND',
+        mask_dilation=0,
+    ),
+)
+
+response = client.models.edit_image(
+    model='imagen-3.0-capability-001',
+    prompt='Sunlight and clear sky',
+    reference_images=[raw_ref_image, mask_ref_image],
+    config=types.EditImageConfig(
+        edit_mode='EDIT_MODE_INPAINT_INSERTION',
+        number_of_images=1,
+        include_rai_reason=True,
+        output_mime_type='image/jpeg',
+    ),
+)
+response.generated_images[0].image.show()
+```
+
+### Edit modes
+
+The `edit_mode` parameter supports:
+
+- **EDIT_MODE_INPAINT_INSERTION** - Insert new content into masked regions
+- **EDIT_MODE_INPAINT_REMOVAL** - Remove content from masked regions
+- **EDIT_MODE_OUTPAINT** - Extend the image beyond its borders
+
+### Mask modes
+
+The `mask_mode` parameter supports:
+
+- **MASK_MODE_BACKGROUND** - Mask the background
+- **MASK_MODE_FOREGROUND** - Mask the foreground
+- **MASK_MODE_SEMANTIC** - Mask based on semantic segmentation

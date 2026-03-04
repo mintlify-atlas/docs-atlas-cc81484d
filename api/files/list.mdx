@@ -1,0 +1,275 @@
+---
+title: files.list
+description: List all uploaded files in the Gemini API
+---
+
+Lists all files that have been uploaded to the Gemini File API. Returns a paginated list of files.
+
+## Method Signature
+
+```python
+client.files.list(
+    config: Optional[ListFilesConfigOrDict] = None
+) -> Pager[File]
+```
+
+## Parameters
+
+<ParamField path="config" type="ListFilesConfig">
+  Optional configuration for the list request.
+  
+  Available options:
+  - `page_size`: Number of files per page (default varies)
+  - `page_token`: Token for fetching a specific page
+  - `http_options`: Custom HTTP request options
+</ParamField>
+
+## Returns
+
+<ResponseField name="pager" type="Pager[File]">
+  A Pager object that automatically handles pagination.
+  
+  When you iterate over the pager, it automatically fetches additional pages as needed.
+  
+  Each File in the pager contains:
+  - `name`: Resource name
+  - `uri`: URI for API calls
+  - `display_name`: Human-readable name
+  - `mime_type`: File type
+  - `size_bytes`: File size
+  - `create_time`: Upload time
+  - `expiration_time`: When the file expires
+  - `state`: Processing state
+</ResponseField>
+
+## Examples
+
+### List All Files
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# List and print all files
+for file in client.files.list():
+    print(f"Name: {file.display_name or file.name}")
+    print(f"Size: {file.size_bytes} bytes")
+    print(f"State: {file.state}")
+    print(f"Created: {file.create_time}")
+    print("---")
+```
+
+### List with Page Size
+
+```python
+# Get files in smaller batches
+for file in client.files.list(config={'page_size': 10}):
+    print(f"{file.display_name}: {file.mime_type}")
+```
+
+### Count Total Files
+
+```python
+# Count all uploaded files
+file_count = sum(1 for _ in client.files.list())
+print(f"Total files: {file_count}")
+```
+
+### Filter Active Files
+
+```python
+# Get only files that are ready to use
+active_files = [f for f in client.files.list() if f.state == 'ACTIVE']
+
+print(f"Active files: {len(active_files)}")
+for file in active_files:
+    print(f"- {file.display_name or file.name}")
+```
+
+### List by File Type
+
+```python
+# Group files by MIME type
+from collections import defaultdict
+
+by_type = defaultdict(list)
+for file in client.files.list():
+    by_type[file.mime_type].append(file)
+
+for mime_type, files in by_type.items():
+    print(f"{mime_type}: {len(files)} files")
+```
+
+### Calculate Total Storage
+
+```python
+# Calculate total storage used
+total_bytes = sum(f.size_bytes for f in client.files.list())
+total_mb = total_bytes / (1024 * 1024)
+
+print(f"Total storage: {total_mb:.2f} MB")
+```
+
+### List Files Expiring Soon
+
+```python
+from datetime import datetime, timedelta
+
+# Find files expiring in the next 12 hours
+now = datetime.now()
+expiring_soon = []
+
+for file in client.files.list():
+    if file.expiration_time:
+        if file.expiration_time - now < timedelta(hours=12):
+            expiring_soon.append(file)
+
+print(f"Files expiring soon: {len(expiring_soon)}")
+for file in expiring_soon:
+    print(f"- {file.display_name}: expires {file.expiration_time}")
+```
+
+### Async List
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def list_files():
+    # List files asynchronously
+    async for file in await client.aio.files.list():
+        print(f"File: {file.display_name}")
+
+asyncio.run(list_files())
+```
+
+### Export File List to JSON
+
+```python
+import json
+
+# Export file metadata to JSON
+files_data = []
+for file in client.files.list():
+    files_data.append({
+        'name': file.name,
+        'display_name': file.display_name,
+        'mime_type': file.mime_type,
+        'size_bytes': file.size_bytes,
+        'state': file.state,
+        'uri': file.uri
+    })
+
+with open('files_list.json', 'w') as f:
+    json.dump(files_data, f, indent=2)
+
+print(f"Exported {len(files_data)} files to files_list.json")
+```
+
+### Find Specific File
+
+```python
+# Find file by display name
+def find_file_by_name(display_name: str):
+    for file in client.files.list():
+        if file.display_name == display_name:
+            return file
+    return None
+
+file = find_file_by_name('My Important Document')
+if file:
+    print(f"Found: {file.name}")
+else:
+    print("File not found")
+```
+
+### List and Delete Old Files
+
+```python
+from datetime import datetime, timedelta
+
+# Delete files older than 24 hours
+deleted_count = 0
+for file in client.files.list():
+    if file.create_time:
+        age = datetime.now() - file.create_time
+        if age > timedelta(hours=24):
+            client.files.delete(name=file.name)
+            deleted_count += 1
+            print(f"Deleted: {file.display_name}")
+
+print(f"Deleted {deleted_count} old files")
+```
+
+### Display File Summary
+
+```python
+# Show summary of all files
+print("File Summary")
+print("=" * 50)
+
+total_size = 0
+by_state = {'ACTIVE': 0, 'PROCESSING': 0, 'FAILED': 0}
+
+for file in client.files.list():
+    total_size += file.size_bytes
+    by_state[file.state] = by_state.get(file.state, 0) + 1
+
+print(f"Total files: {sum(by_state.values())}")
+print(f"Active: {by_state['ACTIVE']}")
+print(f"Processing: {by_state['PROCESSING']}")
+print(f"Failed: {by_state['FAILED']}")
+print(f"Total size: {total_size / (1024*1024):.2f} MB")
+```
+
+### Manual Pagination
+
+```python
+# Manually control pagination
+config = {'page_size': 5}
+response = client.files._list(config=config)
+
+# First page
+for file in response.files:
+    print(file.display_name)
+
+# Get next page if available
+if response.next_page_token:
+    config['page_token'] = response.next_page_token
+    response = client.files._list(config=config)
+    for file in response.files:
+        print(file.display_name)
+```
+
+## Pagination
+
+<Info>
+The `list()` method returns a Pager that automatically handles pagination. You can iterate over it directly without worrying about page tokens.
+
+The pager fetches additional pages automatically as you iterate through the results.
+</Info>
+
+## Error Handling
+
+```python
+try:
+    files = list(client.files.list())
+    print(f"Found {len(files)} files")
+except Exception as e:
+    print(f"Error listing files: {e}")
+```
+
+## API Availability
+
+<Warning>
+This method is **only available in the Gemini API** (not Vertex AI).
+</Warning>
+
+## Related Methods
+
+- [files.upload](/api/files/upload) - Upload a new file
+- [files.get](/api/files/get) - Get file metadata
+- [files.delete](/api/files/delete) - Delete a file

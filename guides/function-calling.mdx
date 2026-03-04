@@ -1,0 +1,211 @@
+---
+title: Function Calling
+description: Use function calling to extend Gemini models with custom tools and actions
+---
+
+Function calling enables Gemini models to interact with external tools and APIs. You can define Python functions that the model can call to perform specific tasks, retrieve data, or take actions.
+
+## Automatic Function Calling
+
+The simplest way to use function calling is to pass Python functions directly. The SDK will automatically call the functions and return the results to the model.
+
+```python
+from google.genai import types
+
+def get_current_weather(location: str) -> str:
+    """Returns the current weather.
+    
+    Args:
+        location: The city and state, e.g. San Francisco, CA
+    """
+    return 'sunny'
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='What is the weather like in Boston?',
+    config=types.GenerateContentConfig(tools=[get_current_weather]),
+)
+
+print(response.text)
+```
+
+The model will automatically:
+1. Recognize when it needs to call a function
+2. Extract the necessary arguments
+3. Call the function
+4. Use the result to generate a final response
+
+## Disabling Automatic Function Calling
+
+If you want to manually handle function calls, disable automatic function calling:
+
+```python
+from google.genai import types
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='What is the weather like in Boston?',
+    config=types.GenerateContentConfig(
+        tools=[get_current_weather],
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            disable=True
+        ),
+    ),
+)
+```
+
+With automatic function calling disabled, you'll receive function call parts in the response:
+
+```python
+function_calls: Optional[List[types.FunctionCall]] = response.function_calls
+```
+
+## Manual Function Declaration
+
+For more control, you can manually declare functions using `FunctionDeclaration`:
+
+```python
+from google.genai import types
+
+function = types.FunctionDeclaration(
+    name='get_current_weather',
+    description='Get the current weather in a given location',
+    parameters_json_schema={
+        'type': 'object',
+        'properties': {
+            'location': {
+                'type': 'string',
+                'description': 'The city and state, e.g. San Francisco, CA',
+            }
+        },
+        'required': ['location'],
+    },
+)
+
+tool = types.Tool(function_declarations=[function])
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents='What is the weather like in Boston?',
+    config=types.GenerateContentConfig(tools=[tool]),
+)
+
+print(response.function_calls[0])
+```
+
+## Invoking Functions Manually
+
+After receiving a function call from the model, you can invoke the function and pass the result back:
+
+```python
+from google.genai import types
+
+user_prompt_content = types.Content(
+    role='user',
+    parts=[types.Part.from_text(text='What is the weather like in Boston?')],
+)
+function_call_part = response.function_calls[0]
+function_call_content = response.candidates[0].content
+
+try:
+    function_result = get_current_weather(
+        **function_call_part.function_call.args
+    )
+    function_response = {'result': function_result}
+except Exception as e:
+    # Let the model handle the error
+    function_response = {'error': str(e)}
+
+function_response_part = types.Part.from_function_response(
+    name=function_call_part.name,
+    response=function_response,
+)
+function_response_content = types.Content(
+    role='tool', parts=[function_response_part]
+)
+
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=[
+        user_prompt_content,
+        function_call_content,
+        function_response_content,
+    ],
+    config=types.GenerateContentConfig(
+        tools=[tool],
+    ),
+)
+
+print(response.text)
+```
+
+## Tool Configuration
+
+### ANY Mode
+
+If you configure function calling mode to `ANY`, the model will always return function call parts:
+
+```python
+from google.genai import types
+
+def get_current_weather(location: str) -> str:
+    """Returns the current weather.
+    
+    Args:
+        location: The city and state, e.g. San Francisco, CA
+    """
+    return "sunny"
+
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="What is the weather like in Boston?",
+    config=types.GenerateContentConfig(
+        tools=[get_current_weather],
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            disable=True
+        ),
+        tool_config=types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(mode='ANY')
+        ),
+    ),
+)
+```
+
+### Limiting Automatic Function Calls
+
+You can limit the number of automatic function call turns. For example, to allow only 1 turn of automatic function calling:
+
+```python
+from google.genai import types
+
+def get_current_weather(location: str) -> str:
+    """Returns the current weather.
+    
+    Args:
+        location: The city and state, e.g. San Francisco, CA
+    """
+    return "sunny"
+
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="What is the weather like in Boston?",
+    config=types.GenerateContentConfig(
+        tools=[get_current_weather],
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            maximum_remote_calls=2  # Set to x+1 for x turns
+        ),
+        tool_config=types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(mode='ANY')
+        ),
+    ),
+)
+```
+
+By default, the SDK performs up to 10 automatic function calls before stopping.
+
+## Best Practices
+
+- **Clear descriptions**: Write detailed docstrings and descriptions to help the model understand when and how to use your functions
+- **Type hints**: Use Python type hints for better function declaration generation
+- **Error handling**: Handle exceptions gracefully and pass error information back to the model
+- **Stateless functions**: Design functions to be stateless when possible for more predictable behavior

@@ -1,0 +1,349 @@
+---
+title: caches.list
+description: List all cached content resources
+---
+
+Lists all cached content resources. Returns a paginated list of caches.
+
+## Method Signature
+
+```python
+client.caches.list(
+    config: Optional[ListCachedContentsConfigOrDict] = None
+) -> Pager[CachedContent]
+```
+
+## Parameters
+
+<ParamField path="config" type="ListCachedContentsConfig">
+  Optional configuration for the list request.
+  
+  Available options:
+  - `page_size`: Number of caches per page
+  - `page_token`: Token for fetching a specific page
+  - `http_options`: Custom HTTP request options
+</ParamField>
+
+## Returns
+
+<ResponseField name="pager" type="Pager[CachedContent]">
+  A Pager object that automatically handles pagination.
+  
+  When you iterate over the pager, it automatically fetches additional pages as needed.
+  
+  Each CachedContent contains:
+  - `name`: Resource name
+  - `model`: Associated model
+  - `display_name`: Human-readable name
+  - `create_time`: Creation timestamp
+  - `update_time`: Last update
+  - `expire_time`: Expiration timestamp
+  - `usage_metadata`: Token usage information
+</ResponseField>
+
+## Examples
+
+### List All Caches
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# List and print all caches
+for cached in client.caches.list():
+    print(f"Name: {cached.display_name or cached.name}")
+    print(f"Model: {cached.model}")
+    print(f"Created: {cached.create_time}")
+    print(f"Expires: {cached.expire_time}")
+    print(f"Tokens: {cached.usage_metadata.total_token_count}")
+    print("---")
+```
+
+### List with Page Size
+
+```python
+# Get caches in smaller batches
+for cached in client.caches.list(config={'page_size': 10}):
+    print(f"{cached.display_name}: {cached.usage_metadata.total_token_count} tokens")
+```
+
+### Count Total Caches
+
+```python
+# Count all cached contents
+cache_count = sum(1 for _ in client.caches.list())
+print(f"Total caches: {cache_count}")
+```
+
+### Find Specific Cache
+
+```python
+# Find cache by display name
+def find_cache_by_name(display_name: str):
+    for cached in client.caches.list():
+        if cached.display_name == display_name:
+            return cached
+    return None
+
+cached = find_cache_by_name('My Important Cache')
+if cached:
+    print(f"Found: {cached.name}")
+else:
+    print("Cache not found")
+```
+
+### Calculate Total Token Usage
+
+```python
+# Calculate total tokens across all caches
+total_tokens = sum(
+    c.usage_metadata.total_token_count 
+    for c in client.caches.list()
+)
+
+print(f"Total cached tokens: {total_tokens:,}")
+print(f"Approximate storage: {total_tokens / 1000:.1f}K tokens")
+```
+
+### List Caches by Model
+
+```python
+from collections import defaultdict
+
+# Group caches by model
+by_model = defaultdict(list)
+for cached in client.caches.list():
+    by_model[cached.model].append(cached)
+
+for model, caches in by_model.items():
+    print(f"{model}: {len(caches)} caches")
+    for cached in caches:
+        print(f"  - {cached.display_name}")
+```
+
+### Find Expiring Caches
+
+```python
+from datetime import datetime, timedelta
+
+# Find caches expiring in the next hour
+expiring_soon = []
+now = datetime.now()
+
+for cached in client.caches.list():
+    time_remaining = cached.expire_time - now
+    if time_remaining < timedelta(hours=1):
+        expiring_soon.append(cached)
+
+print(f"Caches expiring soon: {len(expiring_soon)}")
+for cached in expiring_soon:
+    print(f"- {cached.display_name}: {cached.expire_time}")
+```
+
+### Async List
+
+```python
+import asyncio
+
+async def list_caches():
+    # List caches asynchronously
+    async for cached in await client.aio.caches.list():
+        print(f"Cache: {cached.display_name}")
+        print(f"Expires: {cached.expire_time}")
+
+asyncio.run(list_caches())
+```
+
+### Export Cache List
+
+```python
+import json
+
+# Export cache metadata to JSON
+caches_data = []
+for cached in client.caches.list():
+    caches_data.append({
+        'name': cached.name,
+        'display_name': cached.display_name,
+        'model': cached.model,
+        'create_time': cached.create_time.isoformat() if cached.create_time else None,
+        'expire_time': cached.expire_time.isoformat() if cached.expire_time else None,
+        'tokens': cached.usage_metadata.total_token_count
+    })
+
+with open('caches_list.json', 'w') as f:
+    json.dump(caches_data, f, indent=2)
+
+print(f"Exported {len(caches_data)} caches to caches_list.json")
+```
+
+### Monitor Cache Health
+
+```python
+from datetime import datetime, timedelta
+
+# Check cache health status
+print("Cache Health Report")
+print("=" * 50)
+
+healthy = 0
+expiring = 0
+expired = 0
+now = datetime.now()
+
+for cached in client.caches.list():
+    time_remaining = cached.expire_time - now
+    
+    if time_remaining < timedelta(0):
+        expired += 1
+    elif time_remaining < timedelta(hours=1):
+        expiring += 1
+    else:
+        healthy += 1
+
+print(f"Healthy: {healthy}")
+print(f"Expiring soon (< 1 hour): {expiring}")
+print(f"Expired: {expired}")
+```
+
+### List and Extend Expiring Caches
+
+```python
+from datetime import datetime, timedelta
+
+# Auto-extend caches expiring soon
+for cached in client.caches.list():
+    time_remaining = cached.expire_time - datetime.now()
+    
+    if timedelta(0) < time_remaining < timedelta(minutes=30):
+        # Extend by 1 hour
+        updated = client.caches.update(
+            name=cached.name,
+            config={'ttl': '3600s'}
+        )
+        print(f"Extended {cached.display_name} to {updated.expire_time}")
+```
+
+### Cleanup Old Caches
+
+```python
+from datetime import datetime, timedelta
+
+# Delete caches older than 24 hours
+deleted_count = 0
+for cached in client.caches.list():
+    age = datetime.now() - cached.create_time
+    
+    if age > timedelta(hours=24):
+        client.caches.delete(name=cached.name)
+        deleted_count += 1
+        print(f"Deleted old cache: {cached.display_name}")
+
+print(f"Deleted {deleted_count} old caches")
+```
+
+### Display Cache Summary
+
+```python
+# Show summary of all caches
+print("Cache Summary")
+print("=" * 60)
+
+total_caches = 0
+total_tokens = 0
+oldest = None
+newest = None
+
+for cached in client.caches.list():
+    total_caches += 1
+    total_tokens += cached.usage_metadata.total_token_count
+    
+    if oldest is None or cached.create_time < oldest.create_time:
+        oldest = cached
+    if newest is None or cached.create_time > newest.create_time:
+        newest = cached
+
+print(f"Total caches: {total_caches}")
+print(f"Total tokens: {total_tokens:,}")
+if oldest:
+    print(f"Oldest cache: {oldest.display_name} ({oldest.create_time})")
+if newest:
+    print(f"Newest cache: {newest.display_name} ({newest.create_time})")
+```
+
+### List Caches with Specific Content
+
+```python
+# Find caches containing specific content type
+for cached in client.caches.list():
+    # Check if cache has file data
+    has_files = any(
+        any(part.file_data for part in content.parts)
+        for content in cached.contents
+    )
+    
+    if has_files:
+        print(f"Cache with files: {cached.display_name}")
+```
+
+### Manual Pagination
+
+```python
+# Manually control pagination
+config = {'page_size': 5}
+response = client.caches._list(config=config)
+
+# First page
+print("Page 1:")
+for cached in response.cached_contents:
+    print(f"  {cached.display_name}")
+
+# Get next page if available
+if response.next_page_token:
+    config['page_token'] = response.next_page_token
+    response = client.caches._list(config=config)
+    print("Page 2:")
+    for cached in response.cached_contents:
+        print(f"  {cached.display_name}")
+```
+
+## Pagination
+
+<Info>
+The `list()` method returns a Pager that automatically handles pagination. You can iterate over it directly without worrying about page tokens.
+
+The pager fetches additional pages automatically as you iterate through the results.
+</Info>
+
+## Error Handling
+
+```python
+try:
+    caches = list(client.caches.list())
+    print(f"Found {len(caches)} caches")
+except Exception as e:
+    print(f"Error listing caches: {e}")
+```
+
+## Usage Metadata
+
+<Note>
+Each cache includes `usage_metadata` with:
+- `total_token_count`: Total tokens stored in the cache
+
+This helps track storage costs and optimize cache usage.
+</Note>
+
+## API Availability
+
+<Note>
+This method is available in both **Gemini API** and **Vertex AI**.
+</Note>
+
+## Related Methods
+
+- [caches.create](/api/caches/create) - Create a new cache
+- [caches.get](/api/caches/get) - Get cache metadata
+- [caches.update](/api/caches/update) - Update cache expiration
+- [caches.delete](/api/caches/delete) - Delete a cache

@@ -1,0 +1,144 @@
+---
+title: chats.create
+description: Create a new chat session with the Gemini API
+---
+
+Creates a new chat session to have multi-turn conversations with the model.
+
+## Method Signature
+
+```python
+client.chats.create(
+    model: str,
+    config: Optional[GenerateContentConfigOrDict] = None,
+    history: Optional[list[ContentOrDict]] = None
+) -> Chat
+```
+
+## Parameters
+
+<ParamField path="model" type="string" required>
+  The model to use for the chat session.
+  
+  Example: `'gemini-2.0-flash'` or `'gemini-1.5-pro'`
+</ParamField>
+
+<ParamField path="config" type="GenerateContentConfig">
+  Configuration for the generate content requests in this chat session.
+  
+  This config will be used as the default for all messages sent in the chat unless overridden in individual `send_message()` or `send_message_stream()` calls.
+  
+  Common config options:
+  - `temperature`: Controls randomness (0.0 to 2.0)
+  - `max_output_tokens`: Maximum tokens in response
+  - `top_p`: Nucleus sampling parameter
+  - `top_k`: Top-k sampling parameter
+  - `system_instruction`: System-level instructions
+</ParamField>
+
+<ParamField path="history" type="list[Content]">
+  Previous conversation history to initialize the chat with.
+  
+  Each `Content` object should have:
+  - `role`: Either `"user"` or `"model"`
+  - `parts`: List of content parts (text, images, etc.)
+  
+  If not provided, starts with an empty history.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Chat" type="Chat">
+  A Chat object that maintains conversation state and provides methods to send messages:
+  - `send_message()`: Send a message and get the complete response
+  - `send_message_stream()`: Send a message and stream the response
+  - `get_history()`: Get the conversation history
+</ResponseField>
+
+## Examples
+
+### Basic Chat Session
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Create a new chat session
+chat = client.chats.create(model='gemini-2.0-flash')
+
+# Send messages
+response = chat.send_message('Hello! How are you?')
+print(response.text)
+
+response = chat.send_message('Tell me a joke')
+print(response.text)
+```
+
+### Chat with Configuration
+
+```python
+# Create chat with custom config
+chat = client.chats.create(
+    model='gemini-1.5-pro',
+    config={
+        'temperature': 0.7,
+        'max_output_tokens': 1024,
+        'system_instruction': 'You are a helpful coding assistant.'
+    }
+)
+
+response = chat.send_message('How do I write a Python decorator?')
+print(response.text)
+```
+
+### Chat with History
+
+```python
+from google.genai import types
+
+# Resume a previous conversation
+history = [
+    types.Content(role='user', parts=[types.Part(text='What is Python?')]),
+    types.Content(role='model', parts=[types.Part(text='Python is a high-level programming language...')]),
+]
+
+chat = client.chats.create(
+    model='gemini-2.0-flash',
+    history=history
+)
+
+# Continue the conversation
+response = chat.send_message('What are its main features?')
+print(response.text)
+```
+
+### Async Chat Session
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+async def chat_example():
+    # Create async chat
+    chat = client.aio.chats.create(model='gemini-2.0-flash')
+    
+    # Send message asynchronously
+    response = await chat.send_message('Hello!')
+    print(response.text)
+
+asyncio.run(chat_example())
+```
+
+## API Availability
+
+<Note>
+This method is available in both **Gemini API** and **Vertex AI**.
+</Note>
+
+## Related Methods
+
+- [chat.send_message](/api/chats/send-message) - Send messages in the chat session
+- [models.generate_content](/api/models/generate-content) - Single-turn generation without chat state

@@ -1,0 +1,342 @@
+---
+title: "generate_images"
+description: "Generate images using Imagen models"
+---
+
+## Method Signature
+
+```python
+def generate_images(
+    self,
+    *,
+    model: str,
+    prompt: str,
+    config: Optional[GenerateImagesConfig] = None,
+) -> GenerateImagesResponse
+```
+
+```python
+async def generate_images(
+    self,
+    *,
+    model: str,
+    prompt: str,
+    config: Optional[GenerateImagesConfig] = None,
+) -> GenerateImagesResponse
+```
+
+## Description
+
+Generates images based on a text description using Imagen models. Supports various image generation parameters including aspect ratio, safety filters, and output format control.
+
+## Parameters
+
+<ParamField path="model" type="str" required>
+  The Imagen model to use for generation.
+  
+  Examples:
+  - `'imagen-3.0-generate-002'`
+  - `'imagen-3.0-fast-generate-001'`
+  - `'imagen-3.0-generate-001'`
+</ParamField>
+
+<ParamField path="prompt" type="str" required>
+  A text description of the images to generate.
+  
+  Example: `'A serene mountain landscape at sunset with a lake in the foreground'`
+</ParamField>
+
+<ParamField path="config" type="GenerateImagesConfig">
+  Configuration for image generation.
+  
+  <Expandable title="config properties">
+    <ParamField path="number_of_images" type="int">
+      Number of images to generate (default: 1, max: 4)
+    </ParamField>
+    
+    <ParamField path="aspect_ratio" type="str">
+      Aspect ratio of generated images.
+      
+      Options:
+      - `'1:1'` - Square (default)
+      - `'16:9'` - Landscape
+      - `'9:16'` - Portrait
+      - `'4:3'`
+      - `'3:4'`
+    </ParamField>
+    
+    <ParamField path="negative_prompt" type="str">
+      Text describing what to avoid in the image.
+      
+      Example: `'blurry, low quality, distorted'`
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="seed" type="int">
+      Random seed for reproducible generation.
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="guidance_scale" type="float">
+      How closely to follow the prompt (1.0 to 20.0). Higher values = more faithful to prompt.
+    </ParamField>
+    
+    <ParamField path="safety_filter_level" type="str">
+      Safety filter strictness level.
+      
+      Options:
+      - `'BLOCK_LOW_AND_ABOVE'`
+      - `'BLOCK_MEDIUM_AND_ABOVE'`
+      - `'BLOCK_ONLY_HIGH'`
+      - `'BLOCK_NONE'` (Vertex AI only)
+    </ParamField>
+    
+    <ParamField path="person_generation" type="str">
+      Policy for generating images of people.
+      
+      Options:
+      - `'DONT_ALLOW'` - Don't generate people
+      - `'ALLOW_ADULT'` - Allow adult depictions only
+      - `'ALLOW_ALL'` (Vertex AI only)
+    </ParamField>
+    
+    <ParamField path="include_safety_attributes" type="bool">
+      Include safety classification in response (default: false)
+    </ParamField>
+    
+    <ParamField path="include_rai_reason" type="bool">
+      Include RAI (Responsible AI) filtering reasons (default: false)
+    </ParamField>
+    
+    <ParamField path="language" type="str">
+      Language code for prompt interpretation (e.g., `'en'`, `'es'`, `'ja'`)
+    </ParamField>
+    
+    <ParamField path="output_mime_type" type="str">
+      Output image format.
+      
+      Options:
+      - `'image/jpeg'`
+      - `'image/png'` (default)
+    </ParamField>
+    
+    <ParamField path="output_compression_quality" type="int">
+      JPEG compression quality (1-100). Only applies when output_mime_type is `'image/jpeg'`.
+    </ParamField>
+    
+    <ParamField path="add_watermark" type="bool">
+      Add a watermark to generated images (default: true)
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="image_size" type="str">
+      Image dimensions.
+      
+      Examples: `'1024'`, `'512'`
+    </ParamField>
+    
+    <ParamField path="enhance_prompt" type="bool">
+      Automatically enhance the prompt for better results
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="output_gcs_uri" type="str">
+      Google Cloud Storage URI to save generated images
+      
+      Example: `'gs://my-bucket/images/'`
+      
+      *Vertex AI only*
+    </ParamField>
+    
+    <ParamField path="labels" type="dict[str, str]">
+      Labels to attach to the generation request
+      
+      *Vertex AI only*
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="generated_images" type="list[GeneratedImage]">
+  List of generated images.
+  
+  <Expandable title="GeneratedImage properties">
+    <ResponseField name="image" type="Image">
+      The generated image object with methods:
+      - `.show()` - Display the image
+      - `.save(path)` - Save to file
+      - `.to_pil()` - Convert to PIL Image
+      - `.uri` - GCS URI if saved to cloud storage
+      - `.image_bytes` - Raw image bytes
+    </ResponseField>
+    
+    <ResponseField name="rai_filtered_reason" type="str">
+      Reason if image was filtered by Responsible AI filters
+    </ResponseField>
+    
+    <ResponseField name="safety_attributes" type="SafetyAttributes">
+      Safety classifications (if `include_safety_attributes=True`)
+      
+      <Expandable title="properties">
+        <ResponseField name="scores" type="list[float]">
+          Safety scores for different categories
+        </ResponseField>
+        
+        <ResponseField name="blocked" type="bool">
+          Whether image was blocked
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="enhanced_prompt" type="str">
+      The enhanced prompt used (if `enhance_prompt=True`)
+      
+      *Vertex AI only*
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="positive_prompt_safety_attributes" type="SafetyAttributes">
+  Safety attributes for the prompt itself
+</ResponseField>
+
+## Code Examples
+
+### Basic Image Generation
+
+```python
+from google import genai
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+response = client.models.generate_images(
+    model='imagen-3.0-generate-002',
+    prompt='A majestic mountain landscape at sunset'
+)
+
+# Display the image
+response.generated_images[0].image.show()
+
+# Save the image
+response.generated_images[0].image.save('mountain.png')
+```
+
+### Multiple Images with Custom Settings
+
+```python
+from google.genai import types
+
+response = client.models.generate_images(
+    model='imagen-3.0-generate-002',
+    prompt='A cute robot playing with a cat',
+    config=types.GenerateImagesConfig(
+        number_of_images=4,
+        aspect_ratio='16:9',
+        guidance_scale=15.0,
+        include_rai_reason=True,
+    )
+)
+
+# Process all generated images
+for i, gen_image in enumerate(response.generated_images):
+    gen_image.image.save(f'robot_cat_{i}.png')
+    if gen_image.rai_filtered_reason:
+        print(f"Image {i} filtered: {gen_image.rai_filtered_reason}")
+```
+
+### With Negative Prompt and Safety Settings
+
+```python
+response = client.models.generate_images(
+    model='imagen-3.0-generate-002',
+    prompt='A photorealistic portrait of a person smiling',
+    config=types.GenerateImagesConfig(
+        negative_prompt='blurry, distorted, low quality, cartoon',
+        person_generation='ALLOW_ADULT',
+        safety_filter_level='BLOCK_MEDIUM_AND_ABOVE',
+        include_safety_attributes=True,
+    )
+)
+
+if response.generated_images:
+    print(f"Safety attributes: {response.generated_images[0].safety_attributes}")
+    response.generated_images[0].image.show()
+```
+
+### Save to Cloud Storage
+
+```python
+response = client.models.generate_images(
+    model='imagen-3.0-generate-002',
+    prompt='An abstract geometric pattern',
+    config=types.GenerateImagesConfig(
+        number_of_images=2,
+        output_gcs_uri='gs://my-bucket/images/',
+        output_mime_type='image/jpeg',
+        output_compression_quality=90,
+    )
+)
+
+for gen_image in response.generated_images:
+    print(f"Image saved to: {gen_image.image.uri}")
+```
+
+### High-Quality Output Settings
+
+```python
+response = client.models.generate_images(
+    model='imagen-3.0-generate-002',
+    prompt='A detailed illustration of a steampunk city',
+    config=types.GenerateImagesConfig(
+        aspect_ratio='16:9',
+        guidance_scale=18.0,
+        image_size='1024',
+        output_mime_type='image/png',
+        enhance_prompt=True,
+        seed=42,  # For reproducibility
+    )
+)
+
+print(f"Enhanced prompt: {response.generated_images[0].enhanced_prompt}")
+response.generated_images[0].image.show()
+```
+
+### Async Usage
+
+```python
+import asyncio
+from google import genai
+
+client = genai.Client(vertexai=True, project='my-project', location='us-central1')
+
+async def generate():
+    response = await client.aio.models.generate_images(
+        model='imagen-3.0-generate-002',
+        prompt='A futuristic cityscape at night',
+        config={'number_of_images': 2}
+    )
+    
+    for i, gen_image in enumerate(response.generated_images):
+        gen_image.image.save(f'city_{i}.png')
+
+asyncio.run(generate())
+```
+
+## Notes
+
+- Generation typically takes 5-30 seconds depending on the model and settings
+- Some configuration options are only available on Vertex AI
+- Images may be filtered by safety systems if they violate content policies
+- Use `include_rai_reason=True` to understand why images were filtered
+- The `enhance_prompt` feature can significantly improve results but may alter your intent
+- Higher `guidance_scale` values make the model follow the prompt more closely but may reduce creativity
+
+## Related Methods
+
+- [edit_image](/api/models/edit-image) - Edit existing images
+- [upscale_image](/api/models/upscale-image) - Upscale image resolution

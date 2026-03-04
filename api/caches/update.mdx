@@ -1,0 +1,326 @@
+---
+title: caches.update
+description: Update cached content expiration settings
+---
+
+Updates the expiration settings of a cached content resource. This allows you to extend the lifetime of a cache without recreating it.
+
+## Method Signature
+
+```python
+client.caches.update(
+    name: str,
+    config: Optional[UpdateCachedContentConfigOrDict] = None
+) -> CachedContent
+```
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  The cached content resource name to update.
+  
+  Format: `"cachedContents/abc123"`
+</ParamField>
+
+<ParamField path="config" type="UpdateCachedContentConfig">
+  Configuration for the update.
+  
+  Available options:
+  - `ttl`: New time-to-live duration (e.g., `"3600s"` for 1 hour)
+  - `expire_time`: New specific expiration timestamp
+  
+  <Note>
+  Specify either `ttl` OR `expire_time`, not both.
+  </Note>
+</ParamField>
+
+## Returns
+
+<ResponseField name="cached_content" type="CachedContent">
+  The updated CachedContent object with the new expiration time.
+  
+  Contains:
+  - `name`: Resource name
+  - `expire_time`: Updated expiration timestamp
+  - `update_time`: When the update occurred
+  - All other cache metadata
+</ResponseField>
+
+## Examples
+
+### Extend Cache by Duration
+
+```python
+from google import genai
+
+client = genai.Client(api_key='your-api-key')
+
+# Extend cache by 1 hour from now
+updated = client.caches.update(
+    name='cachedContents/abc123',
+    config={'ttl': '3600s'}
+)
+
+print(f"Cache extended to: {updated.expire_time}")
+print(f"Updated at: {updated.update_time}")
+```
+
+### Set Specific Expiration Time
+
+```python
+from datetime import datetime, timedelta
+
+# Set cache to expire at a specific time
+expire_at = datetime.now() + timedelta(hours=2)
+
+updated = client.caches.update(
+    name='cachedContents/abc123',
+    config={'expire_time': expire_at.isoformat()}
+)
+
+print(f"Cache will expire at: {updated.expire_time}")
+```
+
+### Extend Cache for 24 Hours
+
+```python
+# Extend cache for a full day
+updated = client.caches.update(
+    name='cachedContents/abc123',
+    config={'ttl': '86400s'}  # 24 hours
+)
+
+print(f"Extended for 24 hours until: {updated.expire_time}")
+```
+
+### Conditional Extension
+
+```python
+from datetime import datetime, timedelta
+
+# Extend only if expiring soon
+cache_name = 'cachedContents/abc123'
+cached = client.caches.get(name=cache_name)
+
+time_remaining = cached.expire_time - datetime.now()
+
+if time_remaining < timedelta(minutes=30):
+    print("Cache expiring soon, extending...")
+    updated = client.caches.update(
+        name=cache_name,
+        config={'ttl': '3600s'}
+    )
+    print(f"Extended to: {updated.expire_time}")
+else:
+    print(f"Cache still has {time_remaining} remaining")
+```
+
+### Extend Multiple Caches
+
+```python
+# Extend all caches that are expiring soon
+for cached in client.caches.list():
+    time_remaining = cached.expire_time - datetime.now()
+    
+    if time_remaining < timedelta(hours=1):
+        updated = client.caches.update(
+            name=cached.name,
+            config={'ttl': '7200s'}  # Extend by 2 hours
+        )
+        print(f"Extended {cached.display_name} to {updated.expire_time}")
+```
+
+### Async Update
+
+```python
+import asyncio
+
+async def extend_cache():
+    # Update cache asynchronously
+    updated = await client.aio.caches.update(
+        name='cachedContents/abc123',
+        config={'ttl': '3600s'}
+    )
+    print(f"Cache extended to: {updated.expire_time}")
+    return updated
+
+asyncio.run(extend_cache())
+```
+
+### Extend Cache Before Heavy Usage
+
+```python
+# Extend cache before making many requests
+cache_name = 'cachedContents/abc123'
+
+# Extend to ensure cache stays valid during processing
+updated = client.caches.update(
+    name=cache_name,
+    config={'ttl': '7200s'}  # 2 hours
+)
+
+print(f"Cache secured until: {updated.expire_time}")
+
+# Now make many requests using the cache
+for i in range(100):
+    response = client.models.generate_content(
+        model=updated.name,
+        contents=f'Query {i} using cached context'
+    )
+    # Process response...
+```
+
+### Set Cache to Expire at End of Day
+
+```python
+from datetime import datetime
+
+# Set cache to expire at midnight
+now = datetime.now()
+end_of_day = now.replace(hour=23, minute=59, second=59)
+
+updated = client.caches.update(
+    name='cachedContents/abc123',
+    config={'expire_time': end_of_day.isoformat()}
+)
+
+print(f"Cache will expire at end of day: {updated.expire_time}")
+```
+
+### Keep-Alive Pattern
+
+```python
+import time
+from datetime import datetime, timedelta
+
+def keep_cache_alive(cache_name: str, duration_hours: int = 1):
+    """Periodically extend a cache to keep it alive."""
+    while True:
+        try:
+            # Check current expiration
+            cached = client.caches.get(name=cache_name)
+            time_remaining = cached.expire_time - datetime.now()
+            
+            # Extend if less than 30 minutes remaining
+            if time_remaining < timedelta(minutes=30):
+                ttl_seconds = duration_hours * 3600
+                updated = client.caches.update(
+                    name=cache_name,
+                    config={'ttl': f'{ttl_seconds}s'}
+                )
+                print(f"Extended cache to: {updated.expire_time}")
+            
+            # Check every 15 minutes
+            time.sleep(900)
+        except KeyboardInterrupt:
+            print("Stopped keep-alive")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
+            break
+
+# Keep cache alive for long-running process
+# keep_cache_alive('cachedContents/abc123', duration_hours=2)
+```
+
+### Update and Verify
+
+```python
+# Update and verify the new expiration
+cache_name = 'cachedContents/abc123'
+
+print("Before update:")
+before = client.caches.get(name=cache_name)
+print(f"  Expires: {before.expire_time}")
+
+updated = client.caches.update(
+    name=cache_name,
+    config={'ttl': '3600s'}
+)
+
+print("After update:")
+print(f"  Expires: {updated.expire_time}")
+print(f"  Updated: {updated.update_time}")
+
+# Verify
+verify = client.caches.get(name=cache_name)
+assert verify.expire_time == updated.expire_time
+print("Update verified!")
+```
+
+### Extend with Maximum TTL
+
+```python
+# Extend to maximum allowed TTL (typically 24-48 hours)
+# Check your API documentation for limits
+
+max_ttl_seconds = 172800  # 48 hours
+
+updated = client.caches.update(
+    name='cachedContents/abc123',
+    config={'ttl': f'{max_ttl_seconds}s'}
+)
+
+print(f"Extended to maximum TTL: {updated.expire_time}")
+```
+
+## Important Notes
+
+<Info>
+- Only expiration settings can be updated
+- The cached content itself (documents, context, etc.) cannot be modified
+- To change cached content, you must create a new cache
+- Updates reset the `update_time` but not `create_time`
+</Info>
+
+<Warning>
+You cannot update:
+- The cached content/documents
+- The model
+- System instructions
+- Tools configuration
+- Display name
+
+To modify these, create a new cache with `caches.create()`.
+</Warning>
+
+## TTL Limits
+
+<Note>
+Different APIs may have different maximum TTL limits:
+- **Gemini API**: Check current documentation for limits
+- **Vertex AI**: May have different limits
+
+Attempting to set a TTL beyond the maximum will result in an error.
+</Note>
+
+## Error Handling
+
+```python
+try:
+    updated = client.caches.update(
+        name='cachedContents/abc123',
+        config={'ttl': '3600s'}
+    )
+    print(f"Success: {updated.expire_time}")
+except Exception as e:
+    if "not found" in str(e).lower():
+        print("Cache does not exist or has already expired")
+    elif "ttl" in str(e).lower():
+        print("Invalid TTL value")
+    else:
+        print(f"Update failed: {e}")
+```
+
+## API Availability
+
+<Note>
+This method is available in both **Gemini API** and **Vertex AI**.
+</Note>
+
+## Related Methods
+
+- [caches.create](/api/caches/create) - Create a new cache
+- [caches.get](/api/caches/get) - Get cache metadata
+- [caches.delete](/api/caches/delete) - Delete a cache
+- [caches.list](/api/caches/list) - List all caches

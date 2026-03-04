@@ -1,0 +1,250 @@
+---
+title: HTTP Options
+description: Configure HTTP client settings including API version, base URL, headers, timeout, and extra body parameters
+---
+
+## Overview
+
+The `HttpOptions` class allows you to customize HTTP client behavior for both synchronous and asynchronous requests. You can configure API versions, custom endpoints, headers, timeouts, and choose between httpx and aiohttp clients.
+
+## API Version Selection
+
+By default, the SDK uses the beta API endpoints to support preview features. You can switch to stable API endpoints by setting the API version to `v1`.
+
+### Vertex AI with v1 API
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    vertexai=True,
+    project='your-project-id',
+    location='us-central1',
+    http_options=types.HttpOptions(api_version='v1')
+)
+```
+
+### Gemini Developer API with v1alpha
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=types.HttpOptions(api_version='v1alpha')
+)
+```
+
+## Custom Base URL
+
+Use a custom base URL when working with API gateway proxy servers or custom endpoints. This bypasses standard authentication checks for project, location, or API key.
+
+```python
+from google import genai
+from google.genai import types
+
+base_url = 'https://test-api-gateway-proxy.com'
+client = genai.Client(
+    vertexai=True,  # Currently only vertexai=True is supported
+    http_options=types.HttpOptions(
+        base_url=base_url,
+        headers={'Authorization': 'Bearer test_token'}
+    )
+)
+```
+
+## Custom Headers
+
+Add custom HTTP headers to all requests:
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=types.HttpOptions(
+        headers={
+            'X-Custom-Header': 'custom-value',
+            'User-Agent': 'MyApp/1.0'
+        }
+    )
+)
+```
+
+## Timeout Configuration
+
+Set request timeout in milliseconds:
+
+```python
+from google import genai
+from google.genai import types
+
+# Set 30 second timeout
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=types.HttpOptions(timeout=30000)
+)
+```
+
+## Extra Body Parameters
+
+Add extra parameters to the request body. The structure must match the backend API's request structure.
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    vertexai=True,
+    project='your-project-id',
+    location='us-central1',
+    http_options=types.HttpOptions(
+        extra_body={
+            'customParam': 'value',
+            'debugMode': True
+        }
+    )
+)
+```
+
+Refer to the backend API documentation for available parameters:
+- [Vertex AI REST API](https://cloud.google.com/vertex-ai/docs/reference/rest)
+- [Gemini API REST API](https://ai.google.dev/api/rest)
+
+## Aiohttp for Async Performance
+
+By default, the SDK uses httpx for both sync and async clients. For better async performance, install the aiohttp extra:
+
+```bash
+pip install google-genai[aiohttp]
+```
+
+The SDK configures `trust_env=True` to match httpx's default behavior. Pass additional arguments to `aiohttp.ClientSession.request()` using `async_client_args`:
+
+```python
+import ssl
+from google import genai
+from google.genai import types
+
+# Configure SSL context
+ssl_context = ssl.create_default_context()
+ssl_context.load_cert_chain('client.crt', 'client.key')
+
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=types.HttpOptions(
+        async_client_args={
+            'cookies': {'session': 'abc123'},
+            'ssl': ssl_context,
+            'connector': None,  # Custom connector
+            'trust_env': True
+        }
+    )
+)
+```
+
+### Available Aiohttp Arguments
+
+Common `async_client_args` options include:
+- `cookies`: HTTP cookies
+- `ssl`: SSL context for HTTPS connections
+- `connector`: Custom aiohttp connector
+- `trust_env`: Use environment variables for proxy configuration (default: `True`)
+- `timeout`: aiohttp-specific timeout settings
+
+## Httpx Client Arguments
+
+Pass custom arguments to the httpx client for both sync and async:
+
+```python
+from google import genai
+from google.genai import types
+import httpx
+
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=types.HttpOptions(
+        client_args={
+            'http2': True,
+            'limits': httpx.Limits(max_keepalive_connections=5)
+        },
+        async_client_args={
+            'http2': True,
+            'limits': httpx.Limits(max_keepalive_connections=5)
+        }
+    )
+)
+```
+
+## Custom Client Instances
+
+Provide your own pre-configured client instances:
+
+```python
+import httpx
+from google import genai
+from google.genai import types
+
+# Custom httpx clients
+sync_client = httpx.Client(http2=True)
+async_client = httpx.AsyncClient(http2=True)
+
+client = genai.Client(
+    api_key='GEMINI_API_KEY',
+    http_options=types.HttpOptions(
+        httpx_client=sync_client,
+        httpx_async_client=async_client
+    )
+)
+```
+
+## Complete Configuration Example
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(
+    vertexai=True,
+    project='your-project-id',
+    location='us-central1',
+    http_options=types.HttpOptions(
+        api_version='v1',
+        headers={'X-Custom-Header': 'value'},
+        timeout=60000,  # 60 seconds
+        extra_body={'debugMode': False},
+        retry_options=types.HttpRetryOptions(
+            attempts=5,
+            initial_delay=1.0,
+            max_delay=60.0
+        ),
+        async_client_args={
+            'ssl': None,
+            'trust_env': True
+        }
+    )
+)
+```
+
+## Per-Request HTTP Options
+
+You can also override HTTP options for individual requests:
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key='GEMINI_API_KEY')
+
+# Override timeout for this specific request
+response = client.models.generate_content(
+    model='gemini-2.0-flash-exp',
+    contents='Tell me a story',
+    config=types.GenerateContentConfig(
+        http_options=types.HttpOptions(timeout=120000)  # 2 minutes
+    )
+)
+```
