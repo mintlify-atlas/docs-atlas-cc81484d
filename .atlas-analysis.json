@@ -1,0 +1,209 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Google Gen AI Python SDK",
+  "projectDescription": "Python SDK for integrating Google's generative AI models (Gemini) via the Gemini Developer API and Vertex AI.",
+  "theme": "sequoia",
+  "primaryColor": "#9a9d9e",
+  "lightColor": "#34373b",
+  "darkColor": "#d2d3d4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/client",
+              "concepts/types",
+              "concepts/authentication",
+              "concepts/models"
+            ]
+          },
+          {
+            "group": "Content Generation",
+            "pages": [
+              "guides/generate-content",
+              "guides/streaming",
+              "guides/multimodal",
+              "guides/system-instructions",
+              "guides/json-response"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "guides/function-calling",
+              "guides/mcp-support",
+              "guides/chats",
+              "guides/safety-settings",
+              "guides/caching"
+            ]
+          },
+          {
+            "group": "Media Generation",
+            "pages": [
+              "guides/imagen",
+              "guides/veo"
+            ]
+          },
+          {
+            "group": "Files & Embeddings",
+            "pages": [
+              "guides/files",
+              "guides/embeddings",
+              "guides/tokenization"
+            ]
+          },
+          {
+            "group": "Fine-tuning & Batch",
+            "pages": [
+              "guides/tuning",
+              "guides/batch-prediction"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "guides/http-options",
+              "guides/proxy",
+              "guides/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Client",
+            "pages": [
+              "api/client",
+              "api/async-client"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/generate-content",
+              "api/models/generate-images",
+              "api/models/generate-videos",
+              "api/models/embed-content",
+              "api/models/count-tokens",
+              "api/models/list"
+            ]
+          },
+          {
+            "group": "Chats",
+            "pages": [
+              "api/chats/create",
+              "api/chats/send-message"
+            ]
+          },
+          {
+            "group": "Files",
+            "pages": [
+              "api/files/upload",
+              "api/files/get",
+              "api/files/delete",
+              "api/files/list"
+            ]
+          },
+          {
+            "group": "Caches",
+            "pages": [
+              "api/caches/create",
+              "api/caches/get",
+              "api/caches/update",
+              "api/caches/delete",
+              "api/caches/list"
+            ]
+          },
+          {
+            "group": "Tunings",
+            "pages": [
+              "api/tunings/tune",
+              "api/tunings/get",
+              "api/tunings/list",
+              "api/tunings/cancel"
+            ]
+          },
+          {
+            "group": "Batches",
+            "pages": [
+              "api/batches/create",
+              "api/batches/get",
+              "api/batches/list",
+              "api/batches/delete"
+            ]
+          },
+          {
+            "group": "Interactions (Beta)",
+            "pages": [
+              "api/interactions/create",
+              "api/interactions/get"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/overview",
+              "api/types/content",
+              "api/types/part",
+              "api/types/config"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Generate text, images, and videos with Gemini models",
+    "Multi-turn conversations with chat sessions",
+    "Function calling and automatic tool orchestration",
+    "Multimodal input (text, images, audio, video, PDFs)",
+    "Streaming and async support",
+    "Fine-tuning and batch prediction",
+    "Context caching for efficiency",
+    "Support for both Gemini Developer API and Vertex AI"
+  ],
+  "publicApiSurface": [
+    "Client",
+    "Client.models.generate_content",
+    "Client.models.generate_content_stream",
+    "Client.models.generate_images",
+    "Client.models.generate_videos",
+    "Client.models.embed_content",
+    "Client.models.count_tokens",
+    "Client.models.list",
+    "Client.models.get",
+    "Client.chats.create",
+    "Client.files.upload",
+    "Client.files.get",
+    "Client.files.delete",
+    "Client.files.list",
+    "Client.caches.create",
+    "Client.caches.get",
+    "Client.caches.update",
+    "Client.caches.delete",
+    "Client.tunings.tune",
+    "Client.tunings.get",
+    "Client.tunings.list",
+    "Client.batches.create",
+    "Client.batches.get",
+    "Client.batches.list",
+    "Client.batches.delete",
+    "Client.interactions.create",
+    "Client.aio (async client)",
+    "types",
+    "LocalTokenizer"
+  ]
+}
